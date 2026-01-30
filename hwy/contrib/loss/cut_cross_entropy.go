@@ -19,6 +19,7 @@ package loss
 
 import (
 	stdmath "math"
+	"sync"
 
 	"github.com/ajroetker/go-highway/hwy"
 	"github.com/ajroetker/go-highway/hwy/contrib/math"
@@ -335,4 +336,129 @@ func BaseSwiGLUVec(gate, up hwy.Vec[float32]) hwy.Vec[float32] {
 	sig := math.BaseSigmoidVec[float32](gate)
 	silu := hwy.Mul(gate, sig)
 	return hwy.Mul(silu, up)
+}
+
+// CutCrossEntropyParallel computes cross-entropy loss with parallelism over positions.
+// For large batch sizes, this distributes positions across goroutines.
+//
+// This is useful when processing many positions (e.g., large batches or long sequences)
+// where the computation can benefit from parallel execution.
+//
+// Parameters:
+//   - hiddenStates: [numPositions, hiddenDim] float32 final hidden states
+//   - embeddings: [vocabSize, hiddenDim] float32 output embedding matrix
+//   - labels: [numPositions] int32 ground truth token IDs (-1 = ignore/padding)
+//   - numPositions: number of token positions to compute loss for
+//   - hiddenDim: dimension of hidden states and embeddings
+//   - vocabSize: size of the vocabulary
+//   - numWorkers: number of parallel workers to use
+//
+// Returns: scalar mean loss (float32)
+func CutCrossEntropyParallel(
+	hiddenStates []float32,
+	embeddings []float32,
+	labels []int32,
+	numPositions, hiddenDim, vocabSize, numWorkers int,
+) float32 {
+	if numPositions == 0 || hiddenDim == 0 || vocabSize == 0 {
+		return 0
+	}
+
+	// For small position counts or single worker, don't bother parallelizing
+	if numPositions < 64 || numWorkers <= 1 {
+		return BaseCutCrossEntropy(hiddenStates, embeddings, labels, numPositions, hiddenDim, vocabSize)
+	}
+
+	// Distribute positions across workers
+	positionsPerWorker := (numPositions + numWorkers - 1) / numWorkers
+
+	type partialResult struct {
+		loss  float64
+		count int
+	}
+
+	results := make([]partialResult, numWorkers)
+	var wg sync.WaitGroup
+
+	for w := 0; w < numWorkers; w++ {
+		startPos := w * positionsPerWorker
+		endPos := startPos + positionsPerWorker
+		if endPos > numPositions {
+			endPos = numPositions
+		}
+		if startPos >= numPositions {
+			break
+		}
+
+		wg.Add(1)
+		go func(workerIdx, start, end int) {
+			defer wg.Done()
+
+			partialHs := hiddenStates[start*hiddenDim : end*hiddenDim]
+			partialLabels := labels[start:end]
+			numPos := end - start
+
+			// Count valid positions FIRST before computing loss
+			count := 0
+			for _, l := range partialLabels {
+				if l >= 0 && int(l) < vocabSize {
+					count++
+				}
+			}
+
+			// Only compute loss if there are valid positions
+			partialLoss := float64(0)
+			if count > 0 {
+				loss := BaseCutCrossEntropy(partialHs, embeddings, partialLabels, numPos, hiddenDim, vocabSize)
+				// loss is a mean, convert back to sum for proper aggregation
+				partialLoss = float64(loss) * float64(count)
+			}
+
+			results[workerIdx] = partialResult{loss: partialLoss, count: count}
+		}(w, startPos, endPos)
+	}
+
+	wg.Wait()
+
+	// Aggregate results
+	totalLoss := float64(0)
+	totalCount := 0
+	for _, r := range results {
+		totalLoss += r.loss
+		totalCount += r.count
+	}
+
+	if totalCount == 0 {
+		return 0
+	}
+	return float32(totalLoss / float64(totalCount))
+}
+
+// MemorySavingsEstimate returns the memory usage comparison between standard
+// cross-entropy and Cut Cross-Entropy for a given configuration.
+//
+// Standard cross-entropy requires materializing the full logits matrix
+// [numPositions, vocabSize] plus the softmax probabilities, both as float32.
+// For a 2B model with vocab 32K and batch*seq = 32K, this is ~8 GB.
+//
+// Cut Cross-Entropy only needs O(hiddenDim) working memory per position,
+// which is reused across positions, resulting in dramatic memory savings.
+//
+// Parameters:
+//   - numPositions: number of token positions (batch * sequence length)
+//   - hiddenDim: dimension of hidden states
+//   - vocabSize: size of the vocabulary
+//
+// Returns:
+//   - standardBytes: memory required by standard cross-entropy (logits + softmax)
+//   - cceBytes: memory required by Cut Cross-Entropy (working buffers)
+func MemorySavingsEstimate(numPositions, hiddenDim, vocabSize int) (standardBytes, cceBytes int64) {
+	// Standard CE materializes: [numPositions, vocabSize] logits + softmax
+	standardBytes = int64(numPositions) * int64(vocabSize) * 4 * 2 // logits + softmax, both float32
+
+	// CCE needs: per-position working memory only
+	// One dot product buffer of size hiddenDim, plus logsumexp accumulators
+	cceBytes = int64(hiddenDim) * 4 * 2 // working buffers per position (reused)
+
+	return
 }
