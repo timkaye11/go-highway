@@ -15,6 +15,7 @@
 package loss
 
 import (
+	"fmt"
 	"math"
 	"math/rand"
 	"testing"
@@ -452,7 +453,7 @@ func BenchmarkCutCrossEntropyParallel(b *testing.B) {
 	})
 
 	for _, workers := range []int{2, 4, 8} {
-		b.Run("Parallel_"+string(rune('0'+workers))+"workers", func(b *testing.B) {
+		b.Run(fmt.Sprintf("Parallel_%dworkers", workers), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				_ = CutCrossEntropyParallel(hiddenStates, embeddings, labels, numPositions, hiddenDim, vocabSize, workers)
 			}

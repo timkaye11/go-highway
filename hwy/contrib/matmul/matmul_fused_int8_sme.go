@@ -15,7 +15,7 @@
 // limitations under the License.
 
 // NOTE: This file is named "matmul_fused_int8_sme.go" (starting with 'm')
-// to ensure its init() runs AFTER the base dispatch file.
+// to ensure its init() runs AFTER matmul_fused_int8.go's init().
 // Go executes init() functions in lexicographic filename order within a package.
 
 package matmul
@@ -228,10 +228,7 @@ func parallelFusedInt8MatMulSME(
 	numWorkers := min(runtime.GOMAXPROCS(0), numTiles)
 	var wg sync.WaitGroup
 	for range numWorkers {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-
+		wg.Go(func() {
 			// Get thread-local buffers from pool
 			tileBuf := fusedInt8TilePool.Get().([]float32)
 			tileSize := K * 16
@@ -255,7 +252,7 @@ func parallelFusedInt8MatMulSME(
 				processFusedInt8Tile(inputT, weights, scales, output, tileBuf, outputTile,
 					nTile, M, K, N, numGroups, groupSize)
 			}
-		}()
+		})
 	}
 	wg.Wait()
 }
