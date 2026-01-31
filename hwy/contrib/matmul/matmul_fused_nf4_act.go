@@ -17,8 +17,24 @@ package matmul
 //go:generate go run ../../../cmd/hwygen -input matmul_fused_nf4_act.go -dispatch fusednf4actmatmul -output . -targets avx2,avx512,neon,fallback
 
 import (
+	"sync"
+
 	"github.com/ajroetker/go-highway/hwy"
 	"github.com/ajroetker/go-highway/hwy/contrib/math"
+)
+
+// Buffer pools for fused matmul+activation kernels to reduce GC pressure.
+// Max lane width is 16 (AVX-512), so buffers of size 16 suffice for all platforms.
+var (
+	fusedActDequantBufPool = sync.Pool{
+		New: func() any { return make([]float32, 16) },
+	}
+	fusedActGateBufPool = sync.Pool{
+		New: func() any { return make([]float32, 16) },
+	}
+	fusedActUpBufPool = sync.Pool{
+		New: func() any { return make([]float32, 16) },
+	}
 )
 
 // ActivationType specifies which activation function to apply after matmul.
@@ -212,7 +228,8 @@ func baseFusedNF4MatMulAct(input []float32, packed []uint8, scales []float32, ou
 	numGroups := (N + groupSize - 1) / groupSize
 	lanes := hwy.Zero[float32]().NumLanes()
 
-	dequantBuf := make([]float32, lanes)
+	dequantBuf := fusedActDequantBufPool.Get().([]float32)[:lanes]
+	defer fusedActDequantBufPool.Put(dequantBuf[:cap(dequantBuf)])
 
 	for m := 0; m < M; m++ {
 		inputRow := input[m*K : (m+1)*K]
@@ -286,7 +303,8 @@ func baseFusedInt4MatMulAct(input []float32, packed []uint8, scales []float32, o
 	numGroups := (N + groupSize - 1) / groupSize
 	lanes := hwy.Zero[float32]().NumLanes()
 
-	dequantBuf := make([]float32, lanes)
+	dequantBuf := fusedActDequantBufPool.Get().([]float32)[:lanes]
+	defer fusedActDequantBufPool.Put(dequantBuf[:cap(dequantBuf)])
 
 	for m := 0; m < M; m++ {
 		inputRow := input[m*K : (m+1)*K]
@@ -384,8 +402,10 @@ func BaseFusedNF4MatMulSwiGLU(
 	numGroups := (N + groupSize - 1) / groupSize
 	lanes := hwy.Zero[float32]().NumLanes()
 
-	gateBuf := make([]float32, lanes)
-	upBuf := make([]float32, lanes)
+	gateBuf := fusedActGateBufPool.Get().([]float32)[:lanes]
+	defer fusedActGateBufPool.Put(gateBuf[:cap(gateBuf)])
+	upBuf := fusedActUpBufPool.Get().([]float32)[:lanes]
+	defer fusedActUpBufPool.Put(upBuf[:cap(upBuf)])
 
 	for m := 0; m < M; m++ {
 		inputRow := input[m*K : (m+1)*K]
@@ -492,8 +512,10 @@ func BaseFusedInt4MatMulSwiGLU(
 	numGroups := (N + groupSize - 1) / groupSize
 	lanes := hwy.Zero[float32]().NumLanes()
 
-	gateBuf := make([]float32, lanes)
-	upBuf := make([]float32, lanes)
+	gateBuf := fusedActGateBufPool.Get().([]float32)[:lanes]
+	defer fusedActGateBufPool.Put(gateBuf[:cap(gateBuf)])
+	upBuf := fusedActUpBufPool.Get().([]float32)[:lanes]
+	defer fusedActUpBufPool.Put(upBuf[:cap(upBuf)])
 
 	for m := 0; m < M; m++ {
 		inputRow := input[m*K : (m+1)*K]

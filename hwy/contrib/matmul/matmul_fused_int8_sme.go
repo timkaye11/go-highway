@@ -15,8 +15,10 @@
 // limitations under the License.
 
 // NOTE: This file is named "matmul_fused_int8_sme.go" (starting with 'm')
-// to ensure its init() runs AFTER matmul_fused_int8.go's init().
+// to ensure its init() runs AFTER "fusedint8matmul_arm64.gen.go" (starting with 'f').
 // Go executes init() functions in lexicographic filename order within a package.
+// The generated dispatch sets FusedInt8MatMul to the base implementation; this file's init()
+// must run afterward to override with the SME implementation when available.
 
 package matmul
 

@@ -14,25 +14,9 @@
 
 package matmul
 
+//go:generate go run ../../../cmd/hwygen -input matmul_fused_int8.go -dispatch fusedint8matmul -output . -targets avx2,avx512,neon,fallback
+
 import "github.com/ajroetker/go-highway/hwy"
-
-// FusedInt8MatMul is the dispatch variable for fused Int8 dequantization + matrix multiplication.
-// On platforms with SME, this uses the optimized tiled implementation.
-// On other platforms, this uses the base SIMD implementation.
-var FusedInt8MatMul func(input []float32, weights []int8, scales []float32, output []float32, M, K, N, groupSize int)
-
-// ParallelFusedInt8MatMul is the dispatch variable for parallel fused Int8 matmul.
-// On platforms with SME, this uses parallel tiled execution.
-// On other platforms, this falls back to the serial implementation.
-var ParallelFusedInt8MatMul func(input []float32, weights []int8, scales []float32, output []float32, M, K, N, groupSize int)
-
-func init() {
-	// Default to base implementation
-	FusedInt8MatMul = BaseFusedInt8MatMul
-	ParallelFusedInt8MatMul = func(input []float32, weights []int8, scales []float32, output []float32, M, K, N, groupSize int) {
-		FusedInt8MatMul(input, weights, scales, output, M, K, N, groupSize)
-	}
-}
 
 // BaseFusedInt8MatMul performs fused Int8 dequantization + matrix multiplication.
 // output[m,n] = sum_k(input[m,k] * (weights[k,n] * scale[k,groupIdx]))
@@ -118,30 +102,3 @@ func BaseFusedInt8MatMul(input []float32, weights []int8, scales []float32, outp
 	}
 }
 
-// BaseFusedInt8MatMul_fallback is the scalar fallback for Int8 fused matmul.
-// Used for testing and platforms without SIMD support.
-func BaseFusedInt8MatMul_fallback(input []float32, weights []int8, scales []float32, output []float32, M, K, N, groupSize int) {
-	if M == 0 || K == 0 || N == 0 {
-		return
-	}
-
-	numGroups := (N + groupSize - 1) / groupSize
-
-	for m := 0; m < M; m++ {
-		inputRow := input[m*K : (m+1)*K]
-		outputRow := output[m*N : (m+1)*N]
-
-		for n := 0; n < N; n++ {
-			groupIdx := n / groupSize
-			sum := float32(0)
-			for k := 0; k < K; k++ {
-				weightIdx := k*N + n
-				val := float32(weights[weightIdx])
-				scale := scales[k*numGroups+groupIdx]
-				weight := val * scale
-				sum += inputRow[k] * weight
-			}
-			outputRow[n] = sum
-		}
-	}
-}

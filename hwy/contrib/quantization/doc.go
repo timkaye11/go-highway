@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package quantization provides SIMD-accelerated dequantization functions
-// for common neural network weight quantization formats.
+// Package quantization documents the quantization formats supported by go-highway.
 //
 // Supported formats:
 //   - NF4 (4-bit NormalFloat): Used in QLoRA for efficient LLM fine-tuning
@@ -23,12 +22,22 @@
 // All formats use per-group scaling for improved accuracy. The groupSize
 // parameter controls how many weights share a single scale factor.
 //
-// Example usage:
+// # Fused Dequantization + MatMul
 //
-//	// Dequantize NF4-packed weights
-//	output := make([]float32, numElements)
-//	quantization.DequantizeNF4(packedWeights, scales, output, groupSize)
+// For optimal performance, use the fused kernels in the matmul package which
+// dequantize on-the-fly without materializing the full weight matrix:
 //
-// For fused dequantization + matmul operations, see the matmul package
-// which provides memory-efficient fused kernels.
+//	import "github.com/ajroetker/go-highway/hwy/contrib/matmul"
+//
+//	// Fused NF4 dequant + matmul
+//	matmul.FusedNF4MatMul(input, packedWeights, scales, output, M, K, N, groupSize)
+//
+//	// Fused Int8 dequant + matmul
+//	matmul.FusedInt8MatMul(input, weights, scales, output, M, K, N, groupSize)
+//
+//	// Fused NF4 dequant + matmul + activation (SiLU, GELU, ReLU)
+//	matmul.BaseFusedNF4MatMulSiLU(input, packed, scales, output, M, K, N, groupSize)
+//
+// These fused operations avoid an O(K*N) memory allocation for the dequantized
+// weights, which is critical for large language models.
 package quantization

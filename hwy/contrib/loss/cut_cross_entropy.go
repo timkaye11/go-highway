@@ -210,7 +210,12 @@ func streamingLogsumexp(
 	embeddings []float32,
 	hiddenDim, vocabSize int,
 ) float64 {
-	// Chunk size chosen to keep dot-product buffer in L1 cache
+	// Chunk size of 256 vocabulary entries balances:
+	// 1. Cache locality: 256 * hiddenDim * 4 bytes fits well in L2 cache
+	//    (e.g., for hiddenDim=2048, that's 2MB per chunk)
+	// 2. Streaming efficiency: amortizes loop overhead without excessive memory pressure
+	// 3. Numerical stability: smaller chunks more frequently update the running max,
+	//    reducing the magnitude of exp() arguments
 	const chunkSize = 256
 
 	currentMax := -stdmath.MaxFloat64
@@ -390,10 +395,10 @@ func CutCrossEntropyParallel(
 			break
 		}
 
-		wg.Add(1)
-		go func(workerIdx, start, end int) {
-			defer wg.Done()
-
+		workerIdx := w
+		start := startPos
+		end := endPos
+		wg.Go(func() {
 			partialHs := hiddenStates[start*hiddenDim : end*hiddenDim]
 			partialLabels := labels[start:end]
 			numPos := end - start
@@ -415,7 +420,7 @@ func CutCrossEntropyParallel(
 			}
 
 			results[workerIdx] = partialResult{loss: partialLoss, count: count}
-		}(w, startPos, endPos)
+		})
 	}
 
 	wg.Wait()
