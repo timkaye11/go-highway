@@ -14,7 +14,12 @@
 
 package matmul
 
-//go:generate go run ../../../cmd/hwygen -input matmul_fused_nf4_act.go -dispatch fusednf4actmatmul -output . -targets avx2,avx512,neon,fallback
+// NOTE: Code generation is disabled for this file because hwygen cannot properly
+// transform generic function calls like math.BaseSigmoidVec[float32]() to target-specific
+// versions. The base implementation uses portable hwy.* operations which already
+// provide SIMD acceleration across all platforms.
+// TODO: Re-enable once hwygen supports generic cross-package function calls.
+// go:generate go run ../../../cmd/hwygen -input matmul_fused_nf4_act.go -dispatch fusednf4actmatmul -output . -targets avx2,avx512,neon,fallback
 
 import (
 	"sync"
