@@ -12,29 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build !noasm && darwin && arm64
+//go:build !noasm && arm64
 
 // SME Matrix Multiplication for ARM64 with SME extension
 // Uses FMOPA outer product accumulate with ZA tiles for efficient matrix multiply.
 package asm
 
 import (
-	"runtime"
 	"unsafe"
 
 	"github.com/ajroetker/go-highway/hwy"
 )
-
-// smeGuard locks the current goroutine to its OS thread and attempts to
-// minimize the chance of async preemption during SME streaming mode.
-// SME streaming mode makes ASIMD (NEON) instructions illegal, but Go's
-// runtime uses ASIMD for signal handlers and other operations.
-//
-//go:nosplit
-func smeGuard() func() {
-	runtime.LockOSThread()
-	return runtime.UnlockOSThread
-}
 
 // -march=armv9-a+sme+sme-f64f64+sme-f16f16+bf16 enables SME with f32/f64/f16/bf16 support
 //go:generate go tool goat ../c/matmul_sme_arm64.c -O3 --target arm64 --target-os darwin -e="-march=armv9-a+sme+sme-f64f64+sme-f16f16+bf16"
@@ -62,6 +50,9 @@ func MatMulFMOPAF32(at, b, c []float32, m, n, k int) {
 	if len(at) < k*m || len(b) < k*n || len(c) < m*n {
 		return
 	}
+	// Lock OS thread and serialize SME calls to prevent ZA register corruption
+	defer hwy.SMEGuard()()
+
 	mVal := int64(m)
 	nVal := int64(n)
 	kVal := int64(k)
@@ -94,6 +85,9 @@ func MatMulFMOPAF64(at, b, c []float64, m, n, k int) {
 	if len(at) < k*m || len(b) < k*n || len(c) < m*n {
 		return
 	}
+	// Lock OS thread and serialize SME calls to prevent ZA register corruption
+	defer hwy.SMEGuard()()
+
 	mVal := int64(m)
 	nVal := int64(n)
 	kVal := int64(k)
@@ -128,7 +122,7 @@ func MatMulFMOPAF16(at, b, c []hwy.Float16, m, n, k int) {
 		return
 	}
 	// Lock OS thread to prevent goroutine migration during SME streaming mode
-	defer smeGuard()()
+	defer hwy.SMEGuard()()
 
 	mVal := int64(m)
 	nVal := int64(n)
@@ -167,7 +161,7 @@ func MatMulBFMOPABF16(at, b, c []hwy.BFloat16, m, n, k int) {
 		return
 	}
 	// Lock OS thread to prevent goroutine migration during SME streaming mode
-	defer smeGuard()()
+	defer hwy.SMEGuard()()
 
 	mVal := int64(m)
 	nVal := int64(n)

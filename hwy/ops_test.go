@@ -824,3 +824,63 @@ func TestRSqrtSmallValues(t *testing.T) {
 		}
 	}
 }
+
+func TestNumLanes(t *testing.T) {
+	// NumLanes should be an alias for MaxLanes
+	numLanes := NumLanes[float32]()
+	maxLanes := MaxLanes[float32]()
+
+	if numLanes != maxLanes {
+		t.Errorf("NumLanes[float32]() = %d, want %d (same as MaxLanes)", numLanes, maxLanes)
+	}
+
+	// Test for different types
+	if NumLanes[float64]() != MaxLanes[float64]() {
+		t.Errorf("NumLanes[float64]() != MaxLanes[float64]()")
+	}
+	if NumLanes[int32]() != MaxLanes[int32]() {
+		t.Errorf("NumLanes[int32]() != MaxLanes[int32]()")
+	}
+}
+
+func TestLoadFull(t *testing.T) {
+	// Create data with enough elements for a full vector
+	lanes := NumLanes[float32]()
+	data := make([]float32, lanes*2) // twice as many elements as needed
+	for i := range data {
+		data[i] = float32(i + 1)
+	}
+
+	v := LoadFull(data)
+
+	if v.NumLanes() != lanes {
+		t.Errorf("LoadFull: got %d lanes, want %d", v.NumLanes(), lanes)
+	}
+
+	for i := 0; i < v.NumLanes(); i++ {
+		if v.data[i] != data[i] {
+			t.Errorf("LoadFull: lane %d: got %v, want %v", i, v.data[i], data[i])
+		}
+	}
+}
+
+func TestStoreFull(t *testing.T) {
+	// Create a vector
+	lanes := NumLanes[float32]()
+	srcData := make([]float32, lanes)
+	for i := range srcData {
+		srcData[i] = float32(i + 1)
+	}
+	v := LoadFull(srcData)
+
+	// Create destination with enough space
+	dst := make([]float32, lanes*2)
+
+	StoreFull(v, dst)
+
+	for i := 0; i < v.NumLanes(); i++ {
+		if dst[i] != srcData[i] {
+			t.Errorf("StoreFull: lane %d: got %v, want %v", i, dst[i], srcData[i])
+		}
+	}
+}

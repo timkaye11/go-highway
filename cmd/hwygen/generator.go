@@ -84,11 +84,20 @@ func (g *Generator) Run() error {
 		ConditionalBlocks:  result.ConditionalBlocks,
 		FileSet:            result.FileSet,
 		Imports:            result.Imports,
+		AllFuncs:           result.AllFuncs,
 	}
 
 	for _, target := range targets {
 		var transformed []*ast.FuncDecl
 		hoistedMap := make(map[string]HoistedConst) // Dedupe by var name
+
+		// Pre-compute which functions need the generic half-precision path
+		// (i.e., skip NEON asm specialization) because they use complex ops
+		// like RoundToEven, ConvertToInt32, Pow2, etc. that have no asm equivalent.
+		var genericHalfPrecFuncs map[string]bool
+		if target.Name == "NEON" {
+			genericHalfPrecFuncs = ComputeGenericHalfPrecFuncs(result.Funcs)
+		}
 
 		for _, pf := range result.Funcs {
 			// Skip SIMD generation for functions with interface type parameters
@@ -110,11 +119,26 @@ func (g *Generator) Run() error {
 
 			// Transform for each concrete type
 			for _, elemType := range concreteTypes {
+				// For NEON half-precision types, check if this function needs
+				// the generic path (uses complex ops with no asm equivalent).
+				if target.Name == "NEON" &&
+					(elemType == "hwy.Float16" || elemType == "hwy.BFloat16") &&
+					genericHalfPrecFuncs[pf.Name] {
+					transformOpts.SkipHalfPrecNEON = true
+				} else {
+					transformOpts.SkipHalfPrecNEON = false
+				}
+
 				transformResult := TransformWithOptions(&pf, target, elemType, transformOpts)
 
 				// Add type suffix to function name if not float32
 				if elemType != "float32" && len(pf.TypeParams) > 0 {
 					transformResult.FuncDecl.Name.Name = transformResult.FuncDecl.Name.Name + "_" + typeNameToSuffix(elemType)
+				}
+
+				// Make impl function names unexported for private base functions
+				if pf.Private {
+					transformResult.FuncDecl.Name.Name = makeUnexported(transformResult.FuncDecl.Name.Name)
 				}
 
 				transformed = append(transformed, transformResult.FuncDecl)

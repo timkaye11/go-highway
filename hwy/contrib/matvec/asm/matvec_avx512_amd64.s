@@ -6,19 +6,12 @@
 // flags: -mavx512f -mavx512fp16 -mavx512bf16 -mavx512vl -O3
 // source: ../c/matvec_avx512_amd64.c
 
-TEXT ·matvec_avx512_f16(SB), $0-40
+TEXT ·matvec_avx512_f16(SB), $32-40
 	MOVQ m+0(FP), DI
 	MOVQ v+8(FP), SI
 	MOVQ result+16(FP), DX
 	MOVQ prows+24(FP), CX
 	MOVQ pcols+32(FP), R8
-	BYTE $0x55                             // pushq	%rbp
-	WORD $0x5741                           // pushq	%r15
-	WORD $0x5641                           // pushq	%r14
-	WORD $0x5541                           // pushq	%r13
-	WORD $0x5441                           // pushq	%r12
-	BYTE $0x53                             // pushq	%rbx
-	LONG $0x20ec8348                       // subq	$32, %rsp
 	WORD $0x8b48; BYTE $0x01               // movq	(%rcx), %rax
 	WORD $0x8548; BYTE $0xc0               // testq	%rax, %rax
 	JLE  BB0_26
@@ -29,7 +22,7 @@ TEXT ·matvec_avx512_f16(SB), $0-40
 	JLE  BB0_13
 	WORD $0x8941; BYTE $0xc8               // movl	%ecx, %r8d
 	LONG $0x03e08341                       // andl	$3, %r8d
-	QUAD $0xffffffffff80b949; WORD $0x7fff // movabsq	$9223372036854775680, %r9       ## imm = 0x7FFFFFFFFFFFFF80
+	QUAD $0xffffffffff80b949; WORD $0x7fff // movabsq	$9223372036854775680, %r9
 	LONG $0x7cc98349                       // orq	$124, %r9
 	WORD $0x2149; BYTE $0xc9               // andq	%rcx, %r9
 	LONG $0x06578d4c                       // leaq	6(%rdi), %r10
@@ -52,13 +45,13 @@ BB0_7:
 	JB   BB0_9
 
 BB0_8:
-	QUAD $0xfd724c10087e9562                   // vmovsh	-6(%r10,%r14,2), %xmm1          ## xmm1 = mem[0],zero,zero,zero,zero,zero,zero,zero
+	QUAD $0xfd724c10087e9562                   // vmovsh	-6(%r10,%r14,2), %xmm1
 	LONG $0x087db662; WORD $0x0c99; BYTE $0x76 // vfmadd132sh	(%rsi,%r14,2), %xmm0, %xmm1
-	QUAD $0xfe724410087e9562                   // vmovsh	-4(%r10,%r14,2), %xmm0          ## xmm0 = mem[0],zero,zero,zero,zero,zero,zero,zero
+	QUAD $0xfe724410087e9562                   // vmovsh	-4(%r10,%r14,2), %xmm0
 	QUAD $0x017644990875b662                   // vfmadd132sh	2(%rsi,%r14,2), %xmm1, %xmm0
-	QUAD $0xff724c10087e9562                   // vmovsh	-2(%r10,%r14,2), %xmm1          ## xmm1 = mem[0],zero,zero,zero,zero,zero,zero,zero
+	QUAD $0xff724c10087e9562                   // vmovsh	-2(%r10,%r14,2), %xmm1
 	QUAD $0x02764c99087db662                   // vfmadd132sh	4(%rsi,%r14,2), %xmm0, %xmm1
-	LONG $0x087e9562; WORD $0x0410; BYTE $0x72 // vmovsh	(%r10,%r14,2), %xmm0            ## xmm0 = mem[0],zero,zero,zero,zero,zero,zero,zero
+	LONG $0x087e9562; WORD $0x0410; BYTE $0x72 // vmovsh	(%r10,%r14,2), %xmm0
 	QUAD $0x037644990875b662                   // vfmadd132sh	6(%rsi,%r14,2), %xmm1, %xmm0
 	LONG $0x04c68349                           // addq	$4, %r14
 	WORD $0x394d; BYTE $0xf1                   // cmpq	%r14, %r9
@@ -72,7 +65,7 @@ BB0_9:
 	WORD $0x3145; BYTE $0xe4 // xorl	%r12d, %r12d
 
 BB0_11:
-	LONG $0x087e9562; WORD $0x0c10; BYTE $0x66 // vmovsh	(%r14,%r12,2), %xmm1            ## xmm1 = mem[0],zero,zero,zero,zero,zero,zero,zero
+	LONG $0x087e9562; WORD $0x0c10; BYTE $0x66 // vmovsh	(%r14,%r12,2), %xmm1
 	LONG $0x08759662; WORD $0x04b9; BYTE $0x67 // vfmadd231sh	(%r15,%r12,2), %xmm1, %xmm0
 	WORD $0xff49; BYTE $0xc4                   // incq	%r12
 	WORD $0x394d; BYTE $0xe0                   // cmpq	%r12, %r8
@@ -80,23 +73,23 @@ BB0_11:
 	JMP  BB0_12
 
 BB0_2:
-	QUAD $0xffffffffff80b849; WORD $0x7fff     // movabsq	$9223372036854775680, %r8       ## imm = 0x7FFFFFFFFFFFFF80
+	QUAD $0xffffffffff80b849; WORD $0x7fff     // movabsq	$9223372036854775680, %r8
 	LONG $0x60c88349                           // orq	$96, %r8
 	WORD $0x2149; BYTE $0xc8                   // andq	%rcx, %r8
 	LONG $0xe0518d4c                           // leaq	-32(%rcx), %r10
-	LONG $0x2454894c; BYTE $0x18               // movq	%r10, 24(%rsp)                  ## 8-byte Spill
+	LONG $0x2454894c; BYTE $0x18               // movq	%r10, 24(%rsp)
 	LONG $0x05eac149                           // shrq	$5, %r10
 	WORD $0xff49; BYTE $0xc2                   // incq	%r10
 	WORD $0x8945; BYTE $0xd1                   // movl	%r10d, %r9d
 	LONG $0x03e18341                           // andl	$3, %r9d
 	LONG $0xfce28349                           // andq	$-4, %r10
-	LONG $0x2454894c; BYTE $0x10               // movq	%r10, 16(%rsp)                  ## 8-byte Spill
+	LONG $0x2454894c; BYTE $0x10               // movq	%r10, 16(%rsp)
 	WORD $0x8941; BYTE $0xca                   // movl	%ecx, %r10d
 	LONG $0x03e28341                           // andl	$3, %r10d
-	LONG $0x2454894c; BYTE $0x08               // movq	%r10, 8(%rsp)                   ## 8-byte Spill
+	LONG $0x2454894c; BYTE $0x08               // movq	%r10, 8(%rsp)
 	WORD $0x894d; BYTE $0xc2                   // movq	%r8, %r10
 	WORD $0x2949; BYTE $0xca                   // subq	%rcx, %r10
-	LONG $0x2414894c                           // movq	%r10, (%rsp)                    ## 8-byte Spill
+	LONG $0x2414894c                           // movq	%r10, (%rsp)
 	LONG $0xc0bf8d4c; WORD $0x0000; BYTE $0x00 // leaq	192(%rdi), %r15
 	LONG $0x09248d4c                           // leaq	(%rcx,%rcx), %r12
 	WORD $0x3145; BYTE $0xed                   // xorl	%r13d, %r13d
@@ -112,7 +105,7 @@ BB0_38:
 	JE   BB0_26
 
 BB0_3:
-	LONG $0x247c8348; WORD $0x6018 // cmpq	$96, 24(%rsp)                   ## 8-byte Folded Reload
+	LONG $0x247c8348; WORD $0x6018 // cmpq	$96, 24(%rsp)
 	JAE  BB0_27
 	LONG $0xc057f8c5               // vxorps	%xmm0, %xmm0, %xmm0
 	LONG $0x0020ba41; WORD $0x0000 // movl	$32, %r10d
@@ -123,7 +116,7 @@ BB0_3:
 
 BB0_27:
 	LONG $0xc057f8c5             // vxorps	%xmm0, %xmm0, %xmm0
-	LONG $0x24548b4c; BYTE $0x10 // movq	16(%rsp), %r10                  ## 8-byte Reload
+	LONG $0x24548b4c; BYTE $0x10 // movq	16(%rsp), %r10
 	WORD $0x3145; BYTE $0xf6     // xorl	%r14d, %r14d
 
 BB0_28:
@@ -162,38 +155,38 @@ BB0_33:
 	LONG $0x487cf562; WORD $0xc158             // vaddph	%zmm1, %zmm0, %zmm0
 	LONG $0x197de3c4; WORD $0x01c1             // vextractf128	$1, %ymm0, %xmm1
 	LONG $0x087cf562; WORD $0xc158             // vaddph	%xmm1, %xmm0, %xmm0
-	LONG $0xc8c6f9c5; BYTE $0x01               // vshufpd	$1, %xmm0, %xmm0, %xmm1         ## xmm1 = xmm0[1,0]
+	LONG $0xc8c6f9c5; BYTE $0x01               // vshufpd	$1, %xmm0, %xmm0, %xmm1
 	LONG $0x087cf562; WORD $0xc158             // vaddph	%xmm1, %xmm0, %xmm0
-	LONG $0xc816fac5                           // vmovshdup	%xmm0, %xmm1            ## xmm1 = xmm0[1,1,3,3]
+	LONG $0xc816fac5                           // vmovshdup	%xmm0, %xmm1
 	LONG $0x087cf562; WORD $0xc158             // vaddph	%xmm1, %xmm0, %xmm0
 	LONG $0xd072f1c5; BYTE $0x10               // vpsrld	$16, %xmm0, %xmm1
 	LONG $0x087ef562; WORD $0xc158             // vaddsh	%xmm1, %xmm0, %xmm0
 	WORD $0x3949; BYTE $0xc8                   // cmpq	%rcx, %r8
 	JGE  BB0_38
-	LONG $0x24548b4c; BYTE $0x08               // movq	8(%rsp), %r10                   ## 8-byte Reload
+	LONG $0x24548b4c; BYTE $0x08               // movq	8(%rsp), %r10
 	WORD $0x894d; BYTE $0xc6                   // movq	%r8, %r14
 	WORD $0x854d; BYTE $0xd2                   // testq	%r10, %r10
 	JE   BB0_36
 
 BB0_35:
-	QUAD $0x00754c10087eb562                   // vmovsh	(%rbp,%r14,2), %xmm1            ## xmm1 = mem[0],zero,zero,zero,zero,zero,zero,zero
+	QUAD $0x00754c10087eb562                   // vmovsh	(%rbp,%r14,2), %xmm1
 	LONG $0x0875b662; WORD $0x04b9; BYTE $0x76 // vfmadd231sh	(%rsi,%r14,2), %xmm1, %xmm0
 	WORD $0xff49; BYTE $0xc6                   // incq	%r14
 	WORD $0xff49; BYTE $0xca                   // decq	%r10
 	JNE  BB0_35
 
 BB0_36:
-	LONG $0x243c8348; BYTE $0xfc // cmpq	$-4, (%rsp)                     ## 8-byte Folded Reload
+	LONG $0x243c8348; BYTE $0xfc // cmpq	$-4, (%rsp)
 	JA   BB0_38
 
 BB0_37:
-	QUAD $0x00754c10087eb562                   // vmovsh	(%rbp,%r14,2), %xmm1            ## xmm1 = mem[0],zero,zero,zero,zero,zero,zero,zero
+	QUAD $0x00754c10087eb562                   // vmovsh	(%rbp,%r14,2), %xmm1
 	LONG $0x087db662; WORD $0x0c99; BYTE $0x76 // vfmadd132sh	(%rsi,%r14,2), %xmm0, %xmm1
-	QUAD $0x01754410087eb562                   // vmovsh	2(%rbp,%r14,2), %xmm0           ## xmm0 = mem[0],zero,zero,zero,zero,zero,zero,zero
+	QUAD $0x01754410087eb562                   // vmovsh	2(%rbp,%r14,2), %xmm0
 	QUAD $0x017644990875b662                   // vfmadd132sh	2(%rsi,%r14,2), %xmm1, %xmm0
-	QUAD $0x02754c10087eb562                   // vmovsh	4(%rbp,%r14,2), %xmm1           ## xmm1 = mem[0],zero,zero,zero,zero,zero,zero,zero
+	QUAD $0x02754c10087eb562                   // vmovsh	4(%rbp,%r14,2), %xmm1
 	QUAD $0x02764c99087db662                   // vfmadd132sh	4(%rsi,%r14,2), %xmm0, %xmm1
-	QUAD $0x03754410087eb562                   // vmovsh	6(%rbp,%r14,2), %xmm0           ## xmm0 = mem[0],zero,zero,zero,zero,zero,zero,zero
+	QUAD $0x03754410087eb562                   // vmovsh	6(%rbp,%r14,2), %xmm0
 	QUAD $0x037644990875b662                   // vfmadd132sh	6(%rsi,%r14,2), %xmm1, %xmm0
 	LONG $0x04c68349                           // addq	$4, %r14
 	WORD $0x394c; BYTE $0xf1                   // cmpq	%r14, %rcx
@@ -207,7 +200,7 @@ BB0_13:
 	JMP  BB0_15
 
 BB0_17:
-	QUAD $0xffffffffff80be48; WORD $0x7fff // movabsq	$9223372036854775680, %rsi      ## imm = 0x7FFFFFFFFFFFFF80
+	QUAD $0xffffffffff80be48; WORD $0x7fff // movabsq	$9223372036854775680, %rsi
 	LONG $0x00803d48; WORD $0x0000         // cmpq	$128, %rax
 	JAE  BB0_19
 	WORD $0xc931                           // xorl	%ecx, %ecx
@@ -257,30 +250,16 @@ BB0_16:
 	JNE  BB0_16
 
 BB0_26:
-	LONG $0x20c48348         // addq	$32, %rsp
-	BYTE $0x5b               // popq	%rbx
-	WORD $0x5c41             // popq	%r12
-	WORD $0x5d41             // popq	%r13
-	WORD $0x5e41             // popq	%r14
-	WORD $0x5f41             // popq	%r15
-	BYTE $0x5d               // popq	%rbp
 	WORD $0xf8c5; BYTE $0x77 // vzeroupper
 	RET
 
-TEXT ·matvec_avx512_bf16(SB), $0-40
+TEXT ·matvec_avx512_bf16(SB), $32-40
 	MOVQ m+0(FP), DI
 	MOVQ v+8(FP), SI
 	MOVQ result+16(FP), DX
 	MOVQ prows+24(FP), CX
 	MOVQ pcols+32(FP), R8
-	BYTE $0x55                             // pushq	%rbp
-	WORD $0x5741                           // pushq	%r15
-	WORD $0x5641                           // pushq	%r14
-	WORD $0x5541                           // pushq	%r13
-	WORD $0x5441                           // pushq	%r12
-	BYTE $0x53                             // pushq	%rbx
-	LONG $0x18ec8348                       // subq	$24, %rsp
-	LONG $0x243c8948                       // movq	%rdi, (%rsp)                    ## 8-byte Spill
+	LONG $0x243c8948                       // movq	%rdi, (%rsp)
 	WORD $0x8b48; BYTE $0x01               // movq	(%rcx), %rax
 	WORD $0x8548; BYTE $0xc0               // testq	%rax, %rax
 	JLE  BB1_25
@@ -289,19 +268,19 @@ TEXT ·matvec_avx512_bf16(SB), $0-40
 	JGE  BB1_2
 	WORD $0x8548; BYTE $0xc9               // testq	%rcx, %rcx
 	JLE  BB1_12
-	QUAD $0xffffffffff80b849; WORD $0x7fff // movabsq	$9223372036854775680, %r8       ## imm = 0x7FFFFFFFFFFFFF80
+	QUAD $0xffffffffff80b849; WORD $0x7fff // movabsq	$9223372036854775680, %r8
 	LONG $0x7ec88349                       // orq	$126, %r8
 	WORD $0x2149; BYTE $0xc8               // andq	%rcx, %r8
-	LONG $0x243c8b48                       // movq	(%rsp), %rdi                    ## 8-byte Reload
+	LONG $0x243c8b48                       // movq	(%rsp), %rdi
 	LONG $0x024f8d4c                       // leaq	2(%rdi), %r9
 	LONG $0x09148d4c                       // leaq	(%rcx,%rcx), %r10
 	WORD $0x3145; BYTE $0xdb               // xorl	%r11d, %r11d
 	LONG $0xc057f8c5                       // vxorps	%xmm0, %xmm0, %xmm0
-	LONG $0x24348b4c                       // movq	(%rsp), %r14                    ## 8-byte Reload
+	LONG $0x24348b4c                       // movq	(%rsp), %r14
 	JMP  BB1_7
 
 BB1_11:
-	LONG $0x0c79e3c4; WORD $0x01c9             // vblendps	$1, %xmm1, %xmm0, %xmm1         ## xmm1 = xmm1[0],xmm0[1,2,3]
+	LONG $0x0c79e3c4; WORD $0x01c9             // vblendps	$1, %xmm1, %xmm0, %xmm1
 	LONG $0x087ef262; WORD $0xc972             // vcvtneps2bf16	%xmm1, %xmm1
 	LONG $0x1579a3c4; WORD $0x5a0c; BYTE $0x00 // vpextrw	$0, %xmm1, (%rdx,%r11,2)
 	WORD $0xff49; BYTE $0xc3                   // incq	%r11
@@ -322,14 +301,14 @@ BB1_8:
 	WORD $0xe5c1; BYTE $0x10       // shll	$16, %ebp
 	LONG $0xd76ef9c5               // vmovd	%edi, %xmm2
 	LONG $0xdd6ef9c5               // vmovd	%ebp, %xmm3
-	LONG $0xa969e2c4; BYTE $0xd9   // vfmadd213ss	%xmm1, %xmm2, %xmm3     ## xmm3 = (xmm2 * xmm3) + xmm1
+	LONG $0xa969e2c4; BYTE $0xd9   // vfmadd213ss	%xmm1, %xmm2, %xmm3
 	LONG $0x3cb70f41; BYTE $0x59   // movzwl	(%r9,%rbx,2), %edi
 	WORD $0xe7c1; BYTE $0x10       // shll	$16, %edi
 	LONG $0x5e6cb70f; BYTE $0x02   // movzwl	2(%rsi,%rbx,2), %ebp
 	WORD $0xe5c1; BYTE $0x10       // shll	$16, %ebp
 	LONG $0xd76ef9c5               // vmovd	%edi, %xmm2
 	LONG $0xcd6ef9c5               // vmovd	%ebp, %xmm1
-	LONG $0xa969e2c4; BYTE $0xcb   // vfmadd213ss	%xmm3, %xmm2, %xmm1     ## xmm1 = (xmm2 * xmm1) + xmm3
+	LONG $0xa969e2c4; BYTE $0xcb   // vfmadd213ss	%xmm3, %xmm2, %xmm1
 	LONG $0x02c38348               // addq	$2, %rbx
 	WORD $0x3949; BYTE $0xd8       // cmpq	%rbx, %r8
 	JNE  BB1_8
@@ -346,23 +325,23 @@ BB1_9:
 	WORD $0xe3c1; BYTE $0x10     // shll	$16, %ebx
 	LONG $0xd76ef9c5             // vmovd	%edi, %xmm2
 	LONG $0xdb6ef9c5             // vmovd	%ebx, %xmm3
-	LONG $0xb969e2c4; BYTE $0xcb // vfmadd231ss	%xmm3, %xmm2, %xmm1     ## xmm1 = (xmm2 * xmm3) + xmm1
+	LONG $0xb969e2c4; BYTE $0xcb // vfmadd231ss	%xmm3, %xmm2, %xmm1
 	JMP  BB1_11
 
 BB1_2:
-	QUAD $0xffffffffff80b849; WORD $0x7fff     // movabsq	$9223372036854775680, %r8       ## imm = 0x7FFFFFFFFFFFFF80
+	QUAD $0xffffffffff80b849; WORD $0x7fff     // movabsq	$9223372036854775680, %r8
 	LONG $0x60c88349                           // orq	$96, %r8
 	WORD $0x2149; BYTE $0xc8                   // andq	%rcx, %r8
 	LONG $0xe0518d4c                           // leaq	-32(%rcx), %r10
-	LONG $0x2454894c; BYTE $0x10               // movq	%r10, 16(%rsp)                  ## 8-byte Spill
+	LONG $0x2454894c; BYTE $0x10               // movq	%r10, 16(%rsp)
 	LONG $0x05eac149                           // shrq	$5, %r10
 	WORD $0xff49; BYTE $0xc2                   // incq	%r10
 	LONG $0x01788d49                           // leaq	1(%r8), %rdi
 	WORD $0x8945; BYTE $0xd1                   // movl	%r10d, %r9d
 	LONG $0x03e18341                           // andl	$3, %r9d
 	LONG $0xfce28349                           // andq	$-4, %r10
-	LONG $0x2454894c; BYTE $0x08               // movq	%r10, 8(%rsp)                   ## 8-byte Spill
-	LONG $0x242c8b4c                           // movq	(%rsp), %r13                    ## 8-byte Reload
+	LONG $0x2454894c; BYTE $0x08               // movq	%r10, 8(%rsp)
+	LONG $0x242c8b4c                           // movq	(%rsp), %r13
 	LONG $0xc0b58d4d; WORD $0x0000; BYTE $0x00 // leaq	192(%r13), %r14
 	LONG $0x093c8d4c                           // leaq	(%rcx,%rcx), %r15
 	WORD $0x3145; BYTE $0xe4                   // xorl	%r12d, %r12d
@@ -373,7 +352,7 @@ BB1_33:
 	LONG $0xca28f8c5 // vmovaps	%xmm2, %xmm1
 
 BB1_40:
-	LONG $0x0c79e3c4; WORD $0x01c9             // vblendps	$1, %xmm1, %xmm0, %xmm1         ## xmm1 = xmm1[0],xmm0[1,2,3]
+	LONG $0x0c79e3c4; WORD $0x01c9             // vblendps	$1, %xmm1, %xmm0, %xmm1
 	LONG $0x087ef262; WORD $0xc972             // vcvtneps2bf16	%xmm1, %xmm1
 	LONG $0x1579a3c4; WORD $0x620c; BYTE $0x00 // vpextrw	$0, %xmm1, (%rdx,%r12,2)
 	WORD $0xff49; BYTE $0xc4                   // incq	%r12
@@ -383,7 +362,7 @@ BB1_40:
 	JE   BB1_25
 
 BB1_3:
-	LONG $0x247c8348; WORD $0x6010 // cmpq	$96, 16(%rsp)                   ## 8-byte Folded Reload
+	LONG $0x247c8348; WORD $0x6010 // cmpq	$96, 16(%rsp)
 	JAE  BB1_26
 	LONG $0xc957f0c5               // vxorps	%xmm1, %xmm1, %xmm1
 	LONG $0x0020bb41; WORD $0x0000 // movl	$32, %r11d
@@ -392,7 +371,7 @@ BB1_3:
 
 BB1_26:
 	LONG $0xc957f0c5             // vxorps	%xmm1, %xmm1, %xmm1
-	LONG $0x24548b4c; BYTE $0x08 // movq	8(%rsp), %r10                   ## 8-byte Reload
+	LONG $0x24548b4c; BYTE $0x08 // movq	8(%rsp), %r10
 	WORD $0xed31                 // xorl	%ebp, %ebp
 
 BB1_27:
@@ -412,7 +391,7 @@ BB1_27:
 BB1_29:
 	WORD $0x894d; BYTE $0xe2 // movq	%r12, %r10
 	LONG $0xd1af0f4c         // imulq	%rcx, %r10
-	LONG $0x241c8b48         // movq	(%rsp), %rbx                    ## 8-byte Reload
+	LONG $0x241c8b48         // movq	(%rsp), %rbx
 	LONG $0x53148d4e         // leaq	(%rbx,%r10,2), %r10
 	WORD $0x854d; BYTE $0xc9 // testq	%r9, %r9
 	JE   BB1_32
@@ -431,9 +410,9 @@ BB1_32:
 	LONG $0x4874f162; WORD $0xca58             // vaddps	%zmm2, %zmm1, %zmm1
 	LONG $0x197de3c4; WORD $0x01ca             // vextractf128	$1, %ymm1, %xmm2
 	LONG $0xca58f0c5                           // vaddps	%xmm2, %xmm1, %xmm1
-	LONG $0xd1c6f1c5; BYTE $0x01               // vshufpd	$1, %xmm1, %xmm1, %xmm2         ## xmm2 = xmm1[1,0]
+	LONG $0xd1c6f1c5; BYTE $0x01               // vshufpd	$1, %xmm1, %xmm1, %xmm2
 	LONG $0xca58f0c5                           // vaddps	%xmm2, %xmm1, %xmm1
-	LONG $0xd116fac5                           // vmovshdup	%xmm1, %xmm2            ## xmm2 = xmm1[1,1,3,3]
+	LONG $0xd116fac5                           // vmovshdup	%xmm1, %xmm2
 	LONG $0xd258f2c5                           // vaddss	%xmm2, %xmm1, %xmm2
 	WORD $0x3949; BYTE $0xc8                   // cmpq	%rcx, %r8
 	JGE  BB1_33
@@ -451,7 +430,7 @@ BB1_36:
 	LONG $0x10e3c141             // shll	$16, %r11d
 	LONG $0x6e79c1c4; BYTE $0xda // vmovd	%r10d, %xmm3
 	LONG $0x6e79c1c4; BYTE $0xcb // vmovd	%r11d, %xmm1
-	LONG $0xa961e2c4; BYTE $0xca // vfmadd213ss	%xmm2, %xmm3, %xmm1     ## xmm1 = (xmm3 * xmm1) + xmm2
+	LONG $0xa961e2c4; BYTE $0xca // vfmadd213ss	%xmm2, %xmm3, %xmm1
 	WORD $0x8949; BYTE $0xfa     // movq	%rdi, %r10
 	LONG $0xd128f8c5             // vmovaps	%xmm1, %xmm2
 	WORD $0x3948; BYTE $0xf9     // cmpq	%rdi, %rcx
@@ -467,14 +446,14 @@ BB1_39:
 	WORD $0xe3c1; BYTE $0x10       // shll	$16, %ebx
 	LONG $0x6e79c1c4; BYTE $0xd3   // vmovd	%r11d, %xmm2
 	LONG $0xdb6ef9c5               // vmovd	%ebx, %xmm3
-	LONG $0xa969e2c4; BYTE $0xd9   // vfmadd213ss	%xmm1, %xmm2, %xmm3     ## xmm3 = (xmm2 * xmm3) + xmm1
+	LONG $0xa969e2c4; BYTE $0xd9   // vfmadd213ss	%xmm1, %xmm2, %xmm3
 	LONG $0x5cb70f47; WORD $0x0255 // movzwl	2(%r13,%r10,2), %r11d
 	LONG $0x10e3c141               // shll	$16, %r11d
 	LONG $0x5cb70f42; WORD $0x0256 // movzwl	2(%rsi,%r10,2), %ebx
 	WORD $0xe3c1; BYTE $0x10       // shll	$16, %ebx
 	LONG $0x6e79c1c4; BYTE $0xd3   // vmovd	%r11d, %xmm2
 	LONG $0xcb6ef9c5               // vmovd	%ebx, %xmm1
-	LONG $0xa969e2c4; BYTE $0xcb   // vfmadd213ss	%xmm3, %xmm2, %xmm1     ## xmm1 = (xmm2 * xmm1) + xmm3
+	LONG $0xa969e2c4; BYTE $0xcb   // vfmadd213ss	%xmm3, %xmm2, %xmm1
 	LONG $0x02c28349               // addq	$2, %r10
 	WORD $0x394c; BYTE $0xd1       // cmpq	%r10, %rcx
 	JNE  BB1_39
@@ -490,7 +469,7 @@ BB1_12:
 	JMP  BB1_23
 
 BB1_14:
-	QUAD $0xffffffffff80bf48; WORD $0x7fff // movabsq	$9223372036854775680, %rdi      ## imm = 0x7FFFFFFFFFFFFF80
+	QUAD $0xffffffffff80bf48; WORD $0x7fff // movabsq	$9223372036854775680, %rdi
 	LONG $0x00803d48; WORD $0x0000         // cmpq	$128, %rax
 	JAE  BB1_16
 	WORD $0xf631                           // xorl	%esi, %esi
@@ -542,29 +521,15 @@ BB1_24:
 	JNE  BB1_24
 
 BB1_25:
-	LONG $0x18c48348         // addq	$24, %rsp
-	BYTE $0x5b               // popq	%rbx
-	WORD $0x5c41             // popq	%r12
-	WORD $0x5d41             // popq	%r13
-	WORD $0x5e41             // popq	%r14
-	WORD $0x5f41             // popq	%r15
-	BYTE $0x5d               // popq	%rbp
 	WORD $0xf8c5; BYTE $0x77 // vzeroupper
 	RET
 
-TEXT ·matvec_avx512_f32(SB), $0-40
+TEXT ·matvec_avx512_f32(SB), $32-40
 	MOVQ m+0(FP), DI
 	MOVQ v+8(FP), SI
 	MOVQ result+16(FP), DX
 	MOVQ prows+24(FP), CX
 	MOVQ pcols+32(FP), R8
-	BYTE $0x55                             // pushq	%rbp
-	WORD $0x5741                           // pushq	%r15
-	WORD $0x5641                           // pushq	%r14
-	WORD $0x5541                           // pushq	%r13
-	WORD $0x5441                           // pushq	%r12
-	BYTE $0x53                             // pushq	%rbx
-	LONG $0x20ec8348                       // subq	$32, %rsp
 	WORD $0x8b48; BYTE $0x01               // movq	(%rcx), %rax
 	WORD $0x8548; BYTE $0xc0               // testq	%rax, %rax
 	JLE  BB2_37
@@ -575,7 +540,7 @@ TEXT ·matvec_avx512_f32(SB), $0-40
 	JLE  BB2_13
 	WORD $0x8941; BYTE $0xc8               // movl	%ecx, %r8d
 	LONG $0x03e08341                       // andl	$3, %r8d
-	QUAD $0xffffffffffc0b949; WORD $0x7fff // movabsq	$9223372036854775744, %r9       ## imm = 0x7FFFFFFFFFFFFFC0
+	QUAD $0xffffffffffc0b949; WORD $0x7fff // movabsq	$9223372036854775744, %r9
 	LONG $0x3cc98349                       // orq	$60, %r9
 	WORD $0x2149; BYTE $0xc9               // andq	%rcx, %r9
 	LONG $0x0c578d4c                       // leaq	12(%rdi), %r10
@@ -598,14 +563,14 @@ BB2_7:
 	JB   BB2_9
 
 BB2_8:
-	LONG $0x107a81c4; WORD $0xb24c; BYTE $0xf4 // vmovss	-12(%r10,%r14,4), %xmm1         ## xmm1 = mem[0],zero,zero,zero
-	LONG $0x107a81c4; WORD $0xb254; BYTE $0xf8 // vmovss	-8(%r10,%r14,4), %xmm2          ## xmm2 = mem[0],zero,zero,zero
-	LONG $0x9979a2c4; WORD $0xb60c             // vfmadd132ss	(%rsi,%r14,4), %xmm0, %xmm1 ## xmm1 = (xmm1 * mem) + xmm0
-	LONG $0xb969a2c4; WORD $0xb64c; BYTE $0x04 // vfmadd231ss	4(%rsi,%r14,4), %xmm2, %xmm1 ## xmm1 = (xmm2 * mem) + xmm1
-	LONG $0x107a81c4; WORD $0xb254; BYTE $0xfc // vmovss	-4(%r10,%r14,4), %xmm2          ## xmm2 = mem[0],zero,zero,zero
-	LONG $0x9971a2c4; WORD $0xb654; BYTE $0x08 // vfmadd132ss	8(%rsi,%r14,4), %xmm1, %xmm2 ## xmm2 = (xmm2 * mem) + xmm1
-	LONG $0x107a81c4; WORD $0xb204             // vmovss	(%r10,%r14,4), %xmm0            ## xmm0 = mem[0],zero,zero,zero
-	LONG $0x9969a2c4; WORD $0xb644; BYTE $0x0c // vfmadd132ss	12(%rsi,%r14,4), %xmm2, %xmm0 ## xmm0 = (xmm0 * mem) + xmm2
+	LONG $0x107a81c4; WORD $0xb24c; BYTE $0xf4 // vmovss	-12(%r10,%r14,4), %xmm1
+	LONG $0x107a81c4; WORD $0xb254; BYTE $0xf8 // vmovss	-8(%r10,%r14,4), %xmm2
+	LONG $0x9979a2c4; WORD $0xb60c             // vfmadd132ss	(%rsi,%r14,4), %xmm0, %xmm1
+	LONG $0xb969a2c4; WORD $0xb64c; BYTE $0x04 // vfmadd231ss	4(%rsi,%r14,4), %xmm2, %xmm1
+	LONG $0x107a81c4; WORD $0xb254; BYTE $0xfc // vmovss	-4(%r10,%r14,4), %xmm2
+	LONG $0x9971a2c4; WORD $0xb654; BYTE $0x08 // vfmadd132ss	8(%rsi,%r14,4), %xmm1, %xmm2
+	LONG $0x107a81c4; WORD $0xb204             // vmovss	(%r10,%r14,4), %xmm0
+	LONG $0x9969a2c4; WORD $0xb644; BYTE $0x0c // vfmadd132ss	12(%rsi,%r14,4), %xmm2, %xmm0
 	LONG $0x04c68349                           // addq	$4, %r14
 	WORD $0x394d; BYTE $0xf1                   // cmpq	%r14, %r9
 	JNE  BB2_8
@@ -618,31 +583,31 @@ BB2_9:
 	WORD $0x3145; BYTE $0xe4 // xorl	%r12d, %r12d
 
 BB2_11:
-	LONG $0x107a81c4; WORD $0xa60c // vmovss	(%r14,%r12,4), %xmm1            ## xmm1 = mem[0],zero,zero,zero
-	LONG $0xb97182c4; WORD $0xa704 // vfmadd231ss	(%r15,%r12,4), %xmm1, %xmm0 ## xmm0 = (xmm1 * mem) + xmm0
+	LONG $0x107a81c4; WORD $0xa60c // vmovss	(%r14,%r12,4), %xmm1
+	LONG $0xb97182c4; WORD $0xa704 // vfmadd231ss	(%r15,%r12,4), %xmm1, %xmm0
 	WORD $0xff49; BYTE $0xc4       // incq	%r12
 	WORD $0x394d; BYTE $0xe0       // cmpq	%r12, %r8
 	JNE  BB2_11
 	JMP  BB2_12
 
 BB2_2:
-	QUAD $0xffffffffffc0b849; WORD $0x7fff     // movabsq	$9223372036854775744, %r8       ## imm = 0x7FFFFFFFFFFFFFC0
+	QUAD $0xffffffffffc0b849; WORD $0x7fff     // movabsq	$9223372036854775744, %r8
 	LONG $0x30c88349                           // orq	$48, %r8
 	WORD $0x2149; BYTE $0xc8                   // andq	%rcx, %r8
 	LONG $0xf0518d4c                           // leaq	-16(%rcx), %r10
-	LONG $0x2454894c; BYTE $0x18               // movq	%r10, 24(%rsp)                  ## 8-byte Spill
+	LONG $0x2454894c; BYTE $0x18               // movq	%r10, 24(%rsp)
 	LONG $0x04eac149                           // shrq	$4, %r10
 	WORD $0xff49; BYTE $0xc2                   // incq	%r10
 	WORD $0x8945; BYTE $0xd1                   // movl	%r10d, %r9d
 	LONG $0x03e18341                           // andl	$3, %r9d
 	LONG $0xfce28349                           // andq	$-4, %r10
-	LONG $0x2454894c; BYTE $0x10               // movq	%r10, 16(%rsp)                  ## 8-byte Spill
+	LONG $0x2454894c; BYTE $0x10               // movq	%r10, 16(%rsp)
 	WORD $0x8941; BYTE $0xca                   // movl	%ecx, %r10d
 	LONG $0x03e28341                           // andl	$3, %r10d
-	LONG $0x2454894c; BYTE $0x08               // movq	%r10, 8(%rsp)                   ## 8-byte Spill
+	LONG $0x2454894c; BYTE $0x08               // movq	%r10, 8(%rsp)
 	WORD $0x894d; BYTE $0xc2                   // movq	%r8, %r10
 	WORD $0x2949; BYTE $0xca                   // subq	%rcx, %r10
-	LONG $0x2414894c                           // movq	%r10, (%rsp)                    ## 8-byte Spill
+	LONG $0x2414894c                           // movq	%r10, (%rsp)
 	LONG $0xc0bf8d4c; WORD $0x0000; BYTE $0x00 // leaq	192(%rdi), %r15
 	QUAD $0x000000008d248d4c                   // leaq	(,%rcx,4), %r12
 	WORD $0x3145; BYTE $0xed                   // xorl	%r13d, %r13d
@@ -658,7 +623,7 @@ BB2_36:
 	JE   BB2_37
 
 BB2_3:
-	LONG $0x247c8348; WORD $0x3018 // cmpq	$48, 24(%rsp)                   ## 8-byte Folded Reload
+	LONG $0x247c8348; WORD $0x3018 // cmpq	$48, 24(%rsp)
 	JAE  BB2_25
 	LONG $0xc057f8c5               // vxorps	%xmm0, %xmm0, %xmm0
 	LONG $0x0010ba41; WORD $0x0000 // movl	$16, %r10d
@@ -669,19 +634,19 @@ BB2_3:
 
 BB2_25:
 	LONG $0xc057f8c5             // vxorps	%xmm0, %xmm0, %xmm0
-	LONG $0x24548b4c; BYTE $0x10 // movq	16(%rsp), %r10                  ## 8-byte Reload
+	LONG $0x24548b4c; BYTE $0x10 // movq	16(%rsp), %r10
 	WORD $0x3145; BYTE $0xf6     // xorl	%r14d, %r14d
 
 BB2_26:
 	QUAD $0xfdb74c10487c9162                   // vmovups	-192(%r15,%r14,4), %zmm1
 	QUAD $0xfeb75410487c9162                   // vmovups	-128(%r15,%r14,4), %zmm2
 	QUAD $0xffb75c10487c9162                   // vmovups	-64(%r15,%r14,4), %zmm3
-	LONG $0x487db262; WORD $0x0c98; BYTE $0xb6 // vfmadd132ps	(%rsi,%r14,4), %zmm0, %zmm1 ## zmm1 = (zmm1 * mem) + zmm0
-	QUAD $0x01b64cb8486db262                   // vfmadd231ps	64(%rsi,%r14,4), %zmm2, %zmm1 ## zmm1 = (zmm2 * mem) + zmm1
+	LONG $0x487db262; WORD $0x0c98; BYTE $0xb6 // vfmadd132ps	(%rsi,%r14,4), %zmm0, %zmm1
+	QUAD $0x01b64cb8486db262                   // vfmadd231ps	64(%rsi,%r14,4), %zmm2, %zmm1
 	LONG $0x487c9162; WORD $0x1410; BYTE $0xb7 // vmovups	(%r15,%r14,4), %zmm2
-	QUAD $0x02b64cb84865b262                   // vfmadd231ps	128(%rsi,%r14,4), %zmm3, %zmm1 ## zmm1 = (zmm3 * mem) + zmm1
+	QUAD $0x02b64cb84865b262                   // vfmadd231ps	128(%rsi,%r14,4), %zmm3, %zmm1
 	LONG $0x487cf162; WORD $0xc128             // vmovaps	%zmm1, %zmm0
-	QUAD $0x03b644b8486db262                   // vfmadd231ps	192(%rsi,%r14,4), %zmm2, %zmm0 ## zmm0 = (zmm2 * mem) + zmm0
+	QUAD $0x03b644b8486db262                   // vfmadd231ps	192(%rsi,%r14,4), %zmm2, %zmm0
 	LONG $0x40c68349                           // addq	$64, %r14
 	LONG $0xfcc28349                           // addq	$-4, %r10
 	JNE  BB2_26
@@ -697,7 +662,7 @@ BB2_29:
 
 BB2_30:
 	LONG $0x487cb162; WORD $0x0c10; BYTE $0xb3 // vmovups	(%rbx,%r14,4), %zmm1
-	LONG $0x4875b262; WORD $0x04b8; BYTE $0xb6 // vfmadd231ps	(%rsi,%r14,4), %zmm1, %zmm0 ## zmm0 = (zmm1 * mem) + zmm0
+	LONG $0x4875b262; WORD $0x04b8; BYTE $0xb6 // vfmadd231ps	(%rsi,%r14,4), %zmm1, %zmm0
 	WORD $0x894d; BYTE $0xd6                   // movq	%r10, %r14
 	LONG $0x10c28349                           // addq	$16, %r10
 	WORD $0xff49; BYTE $0xcb                   // decq	%r11
@@ -708,37 +673,37 @@ BB2_31:
 	LONG $0x487cf162; WORD $0xc158             // vaddps	%zmm1, %zmm0, %zmm0
 	LONG $0x197de3c4; WORD $0x01c1             // vextractf128	$1, %ymm0, %xmm1
 	LONG $0xc158f8c5                           // vaddps	%xmm1, %xmm0, %xmm0
-	LONG $0xc8c6f9c5; BYTE $0x01               // vshufpd	$1, %xmm0, %xmm0, %xmm1         ## xmm1 = xmm0[1,0]
+	LONG $0xc8c6f9c5; BYTE $0x01               // vshufpd	$1, %xmm0, %xmm0, %xmm1
 	LONG $0xc158f8c5                           // vaddps	%xmm1, %xmm0, %xmm0
-	LONG $0xc816fac5                           // vmovshdup	%xmm0, %xmm1            ## xmm1 = xmm0[1,1,3,3]
+	LONG $0xc816fac5                           // vmovshdup	%xmm0, %xmm1
 	LONG $0xc158fac5                           // vaddss	%xmm1, %xmm0, %xmm0
 	WORD $0x3949; BYTE $0xc8                   // cmpq	%rcx, %r8
 	JGE  BB2_36
-	LONG $0x24548b4c; BYTE $0x08               // movq	8(%rsp), %r10                   ## 8-byte Reload
+	LONG $0x24548b4c; BYTE $0x08               // movq	8(%rsp), %r10
 	WORD $0x894d; BYTE $0xc6                   // movq	%r8, %r14
 	WORD $0x854d; BYTE $0xd2                   // testq	%r10, %r10
 	JE   BB2_34
 
 BB2_33:
-	LONG $0x107aa1c4; WORD $0xb54c; BYTE $0x00 // vmovss	(%rbp,%r14,4), %xmm1            ## xmm1 = mem[0],zero,zero,zero
-	LONG $0xb971a2c4; WORD $0xb604             // vfmadd231ss	(%rsi,%r14,4), %xmm1, %xmm0 ## xmm0 = (xmm1 * mem) + xmm0
+	LONG $0x107aa1c4; WORD $0xb54c; BYTE $0x00 // vmovss	(%rbp,%r14,4), %xmm1
+	LONG $0xb971a2c4; WORD $0xb604             // vfmadd231ss	(%rsi,%r14,4), %xmm1, %xmm0
 	WORD $0xff49; BYTE $0xc6                   // incq	%r14
 	WORD $0xff49; BYTE $0xca                   // decq	%r10
 	JNE  BB2_33
 
 BB2_34:
-	LONG $0x243c8348; BYTE $0xfc // cmpq	$-4, (%rsp)                     ## 8-byte Folded Reload
+	LONG $0x243c8348; BYTE $0xfc // cmpq	$-4, (%rsp)
 	JA   BB2_36
 
 BB2_35:
-	LONG $0x107aa1c4; WORD $0xb54c; BYTE $0x00 // vmovss	(%rbp,%r14,4), %xmm1            ## xmm1 = mem[0],zero,zero,zero
-	LONG $0x107aa1c4; WORD $0xb554; BYTE $0x04 // vmovss	4(%rbp,%r14,4), %xmm2           ## xmm2 = mem[0],zero,zero,zero
-	LONG $0x9979a2c4; WORD $0xb60c             // vfmadd132ss	(%rsi,%r14,4), %xmm0, %xmm1 ## xmm1 = (xmm1 * mem) + xmm0
-	LONG $0xb969a2c4; WORD $0xb64c; BYTE $0x04 // vfmadd231ss	4(%rsi,%r14,4), %xmm2, %xmm1 ## xmm1 = (xmm2 * mem) + xmm1
-	LONG $0x107aa1c4; WORD $0xb554; BYTE $0x08 // vmovss	8(%rbp,%r14,4), %xmm2           ## xmm2 = mem[0],zero,zero,zero
-	LONG $0x9971a2c4; WORD $0xb654; BYTE $0x08 // vfmadd132ss	8(%rsi,%r14,4), %xmm1, %xmm2 ## xmm2 = (xmm2 * mem) + xmm1
-	LONG $0x107aa1c4; WORD $0xb544; BYTE $0x0c // vmovss	12(%rbp,%r14,4), %xmm0          ## xmm0 = mem[0],zero,zero,zero
-	LONG $0x9969a2c4; WORD $0xb644; BYTE $0x0c // vfmadd132ss	12(%rsi,%r14,4), %xmm2, %xmm0 ## xmm0 = (xmm0 * mem) + xmm2
+	LONG $0x107aa1c4; WORD $0xb54c; BYTE $0x00 // vmovss	(%rbp,%r14,4), %xmm1
+	LONG $0x107aa1c4; WORD $0xb554; BYTE $0x04 // vmovss	4(%rbp,%r14,4), %xmm2
+	LONG $0x9979a2c4; WORD $0xb60c             // vfmadd132ss	(%rsi,%r14,4), %xmm0, %xmm1
+	LONG $0xb969a2c4; WORD $0xb64c; BYTE $0x04 // vfmadd231ss	4(%rsi,%r14,4), %xmm2, %xmm1
+	LONG $0x107aa1c4; WORD $0xb554; BYTE $0x08 // vmovss	8(%rbp,%r14,4), %xmm2
+	LONG $0x9971a2c4; WORD $0xb654; BYTE $0x08 // vfmadd132ss	8(%rsi,%r14,4), %xmm1, %xmm2
+	LONG $0x107aa1c4; WORD $0xb544; BYTE $0x0c // vmovss	12(%rbp,%r14,4), %xmm0
+	LONG $0x9969a2c4; WORD $0xb644; BYTE $0x0c // vfmadd132ss	12(%rsi,%r14,4), %xmm2, %xmm0
 	LONG $0x04c68349                           // addq	$4, %r14
 	WORD $0x394c; BYTE $0xf1                   // cmpq	%r14, %rcx
 	JNE  BB2_35
@@ -751,7 +716,7 @@ BB2_13:
 	JMP  BB2_24
 
 BB2_15:
-	QUAD $0xffffffffffc0be48; WORD $0x7fff // movabsq	$9223372036854775744, %rsi      ## imm = 0x7FFFFFFFFFFFFFC0
+	QUAD $0xffffffffffc0be48; WORD $0x7fff // movabsq	$9223372036854775744, %rsi
 	LONG $0x40f88348                       // cmpq	$64, %rax
 	JAE  BB2_17
 	WORD $0xc931                           // xorl	%ecx, %ecx
@@ -799,29 +764,15 @@ BB2_24:
 	JMP  BB2_23
 
 BB2_37:
-	LONG $0x20c48348         // addq	$32, %rsp
-	BYTE $0x5b               // popq	%rbx
-	WORD $0x5c41             // popq	%r12
-	WORD $0x5d41             // popq	%r13
-	WORD $0x5e41             // popq	%r14
-	WORD $0x5f41             // popq	%r15
-	BYTE $0x5d               // popq	%rbp
 	WORD $0xf8c5; BYTE $0x77 // vzeroupper
 	RET
 
-TEXT ·matvec_avx512_f64(SB), $0-40
+TEXT ·matvec_avx512_f64(SB), $32-40
 	MOVQ m+0(FP), DI
 	MOVQ v+8(FP), SI
 	MOVQ result+16(FP), DX
 	MOVQ prows+24(FP), CX
 	MOVQ pcols+32(FP), R8
-	BYTE $0x55               // pushq	%rbp
-	WORD $0x5741             // pushq	%r15
-	WORD $0x5641             // pushq	%r14
-	WORD $0x5541             // pushq	%r13
-	WORD $0x5441             // pushq	%r12
-	BYTE $0x53               // pushq	%rbx
-	LONG $0x20ec8348         // subq	$32, %rsp
 	WORD $0x8b48; BYTE $0x01 // movq	(%rcx), %rax
 	WORD $0x8548; BYTE $0xc0 // testq	%rax, %rax
 	JLE  BB3_27
@@ -844,52 +795,52 @@ BB3_14:
 	JE   BB3_27
 
 BB3_7:
-	LONG $0x4f10fbc5; BYTE $0xd0   // vmovsd	-48(%rdi), %xmm1                ## xmm1 = mem[0],zero
-	LONG $0x99f9e2c4; BYTE $0x0e   // vfmadd132sd	(%rsi), %xmm0, %xmm1    ## xmm1 = (xmm1 * mem) + xmm0
+	LONG $0x4f10fbc5; BYTE $0xd0   // vmovsd	-48(%rdi), %xmm1
+	LONG $0x99f9e2c4; BYTE $0x0e   // vfmadd132sd	(%rsi), %xmm0, %xmm1
 	LONG $0x01f98348               // cmpq	$1, %rcx
 	JE   BB3_14
-	LONG $0x5710fbc5; BYTE $0xd8   // vmovsd	-40(%rdi), %xmm2                ## xmm2 = mem[0],zero
-	LONG $0xb9e9e2c4; WORD $0x084e // vfmadd231sd	8(%rsi), %xmm2, %xmm1   ## xmm1 = (xmm2 * mem) + xmm1
+	LONG $0x5710fbc5; BYTE $0xd8   // vmovsd	-40(%rdi), %xmm2
+	LONG $0xb9e9e2c4; WORD $0x084e // vfmadd231sd	8(%rsi), %xmm2, %xmm1
 	LONG $0x02f98348               // cmpq	$2, %rcx
 	JE   BB3_14
-	LONG $0x5710fbc5; BYTE $0xe0   // vmovsd	-32(%rdi), %xmm2                ## xmm2 = mem[0],zero
-	LONG $0xb9e9e2c4; WORD $0x104e // vfmadd231sd	16(%rsi), %xmm2, %xmm1  ## xmm1 = (xmm2 * mem) + xmm1
+	LONG $0x5710fbc5; BYTE $0xe0   // vmovsd	-32(%rdi), %xmm2
+	LONG $0xb9e9e2c4; WORD $0x104e // vfmadd231sd	16(%rsi), %xmm2, %xmm1
 	LONG $0x03f98348               // cmpq	$3, %rcx
 	JE   BB3_14
-	LONG $0x5710fbc5; BYTE $0xe8   // vmovsd	-24(%rdi), %xmm2                ## xmm2 = mem[0],zero
-	LONG $0xb9e9e2c4; WORD $0x184e // vfmadd231sd	24(%rsi), %xmm2, %xmm1  ## xmm1 = (xmm2 * mem) + xmm1
+	LONG $0x5710fbc5; BYTE $0xe8   // vmovsd	-24(%rdi), %xmm2
+	LONG $0xb9e9e2c4; WORD $0x184e // vfmadd231sd	24(%rsi), %xmm2, %xmm1
 	LONG $0x04f98348               // cmpq	$4, %rcx
 	JE   BB3_14
-	LONG $0x5710fbc5; BYTE $0xf0   // vmovsd	-16(%rdi), %xmm2                ## xmm2 = mem[0],zero
-	LONG $0xb9e9e2c4; WORD $0x204e // vfmadd231sd	32(%rsi), %xmm2, %xmm1  ## xmm1 = (xmm2 * mem) + xmm1
+	LONG $0x5710fbc5; BYTE $0xf0   // vmovsd	-16(%rdi), %xmm2
+	LONG $0xb9e9e2c4; WORD $0x204e // vfmadd231sd	32(%rsi), %xmm2, %xmm1
 	LONG $0x05f98348               // cmpq	$5, %rcx
 	JE   BB3_14
-	LONG $0x5710fbc5; BYTE $0xf8   // vmovsd	-8(%rdi), %xmm2                 ## xmm2 = mem[0],zero
-	LONG $0xb9e9e2c4; WORD $0x284e // vfmadd231sd	40(%rsi), %xmm2, %xmm1  ## xmm1 = (xmm2 * mem) + xmm1
+	LONG $0x5710fbc5; BYTE $0xf8   // vmovsd	-8(%rdi), %xmm2
+	LONG $0xb9e9e2c4; WORD $0x284e // vfmadd231sd	40(%rsi), %xmm2, %xmm1
 	LONG $0x06f98348               // cmpq	$6, %rcx
 	JE   BB3_14
-	LONG $0x1710fbc5               // vmovsd	(%rdi), %xmm2                   ## xmm2 = mem[0],zero
-	LONG $0xb9e9e2c4; WORD $0x304e // vfmadd231sd	48(%rsi), %xmm2, %xmm1  ## xmm1 = (xmm2 * mem) + xmm1
+	LONG $0x1710fbc5               // vmovsd	(%rdi), %xmm2
+	LONG $0xb9e9e2c4; WORD $0x304e // vfmadd231sd	48(%rsi), %xmm2, %xmm1
 	JMP  BB3_14
 
 BB3_2:
-	QUAD $0xffffffffffe0b849; WORD $0x7fff     // movabsq	$9223372036854775776, %r8       ## imm = 0x7FFFFFFFFFFFFFE0
+	QUAD $0xffffffffffe0b849; WORD $0x7fff     // movabsq	$9223372036854775776, %r8
 	LONG $0x18c88349                           // orq	$24, %r8
 	WORD $0x2149; BYTE $0xc8                   // andq	%rcx, %r8
 	LONG $0xf8518d4c                           // leaq	-8(%rcx), %r10
-	LONG $0x2454894c; BYTE $0x18               // movq	%r10, 24(%rsp)                  ## 8-byte Spill
+	LONG $0x2454894c; BYTE $0x18               // movq	%r10, 24(%rsp)
 	LONG $0x03eac149                           // shrq	$3, %r10
 	WORD $0xff49; BYTE $0xc2                   // incq	%r10
 	WORD $0x8945; BYTE $0xd1                   // movl	%r10d, %r9d
 	LONG $0x03e18341                           // andl	$3, %r9d
 	LONG $0xfce28349                           // andq	$-4, %r10
-	LONG $0x2454894c; BYTE $0x10               // movq	%r10, 16(%rsp)                  ## 8-byte Spill
+	LONG $0x2454894c; BYTE $0x10               // movq	%r10, 16(%rsp)
 	WORD $0x8941; BYTE $0xca                   // movl	%ecx, %r10d
 	LONG $0x03e28341                           // andl	$3, %r10d
-	LONG $0x2454894c; BYTE $0x08               // movq	%r10, 8(%rsp)                   ## 8-byte Spill
+	LONG $0x2454894c; BYTE $0x08               // movq	%r10, 8(%rsp)
 	WORD $0x894d; BYTE $0xc2                   // movq	%r8, %r10
 	WORD $0x2949; BYTE $0xca                   // subq	%rcx, %r10
-	LONG $0x2414894c                           // movq	%r10, (%rsp)                    ## 8-byte Spill
+	LONG $0x2414894c                           // movq	%r10, (%rsp)
 	LONG $0xc0bf8d4c; WORD $0x0000; BYTE $0x00 // leaq	192(%rdi), %r15
 	QUAD $0x00000000cd248d4c                   // leaq	(,%rcx,8), %r12
 	WORD $0x3145; BYTE $0xed                   // xorl	%r13d, %r13d
@@ -905,7 +856,7 @@ BB3_39:
 	JE   BB3_27
 
 BB3_3:
-	LONG $0x247c8348; WORD $0x1818 // cmpq	$24, 24(%rsp)                   ## 8-byte Folded Reload
+	LONG $0x247c8348; WORD $0x1818 // cmpq	$24, 24(%rsp)
 	JAE  BB3_28
 	LONG $0xc057f9c5               // vxorpd	%xmm0, %xmm0, %xmm0
 	LONG $0x0008ba41; WORD $0x0000 // movl	$8, %r10d
@@ -916,19 +867,19 @@ BB3_3:
 
 BB3_28:
 	LONG $0xc057f9c5             // vxorpd	%xmm0, %xmm0, %xmm0
-	LONG $0x24548b4c; BYTE $0x10 // movq	16(%rsp), %r10                  ## 8-byte Reload
+	LONG $0x24548b4c; BYTE $0x10 // movq	16(%rsp), %r10
 	WORD $0x3145; BYTE $0xf6     // xorl	%r14d, %r14d
 
 BB3_29:
 	QUAD $0xfdf74c1048fd9162                   // vmovupd	-192(%r15,%r14,8), %zmm1
 	QUAD $0xfef7541048fd9162                   // vmovupd	-128(%r15,%r14,8), %zmm2
 	QUAD $0xfff75c1048fd9162                   // vmovupd	-64(%r15,%r14,8), %zmm3
-	LONG $0x48fdb262; WORD $0x0c98; BYTE $0xf6 // vfmadd132pd	(%rsi,%r14,8), %zmm0, %zmm1 ## zmm1 = (zmm1 * mem) + zmm0
-	QUAD $0x01f64cb848edb262                   // vfmadd231pd	64(%rsi,%r14,8), %zmm2, %zmm1 ## zmm1 = (zmm2 * mem) + zmm1
+	LONG $0x48fdb262; WORD $0x0c98; BYTE $0xf6 // vfmadd132pd	(%rsi,%r14,8), %zmm0, %zmm1
+	QUAD $0x01f64cb848edb262                   // vfmadd231pd	64(%rsi,%r14,8), %zmm2, %zmm1
 	LONG $0x48fd9162; WORD $0x1410; BYTE $0xf7 // vmovupd	(%r15,%r14,8), %zmm2
-	QUAD $0x02f64cb848e5b262                   // vfmadd231pd	128(%rsi,%r14,8), %zmm3, %zmm1 ## zmm1 = (zmm3 * mem) + zmm1
+	QUAD $0x02f64cb848e5b262                   // vfmadd231pd	128(%rsi,%r14,8), %zmm3, %zmm1
 	LONG $0x48fdf162; WORD $0xc128             // vmovapd	%zmm1, %zmm0
-	QUAD $0x03f644b848edb262                   // vfmadd231pd	192(%rsi,%r14,8), %zmm2, %zmm0 ## zmm0 = (zmm2 * mem) + zmm0
+	QUAD $0x03f644b848edb262                   // vfmadd231pd	192(%rsi,%r14,8), %zmm2, %zmm0
 	LONG $0x20c68349                           // addq	$32, %r14
 	LONG $0xfcc28349                           // addq	$-4, %r10
 	JNE  BB3_29
@@ -944,7 +895,7 @@ BB3_32:
 
 BB3_33:
 	LONG $0x48fdb162; WORD $0x0c10; BYTE $0xf3 // vmovupd	(%rbx,%r14,8), %zmm1
-	LONG $0x48f5b262; WORD $0x04b8; BYTE $0xf6 // vfmadd231pd	(%rsi,%r14,8), %zmm1, %zmm0 ## zmm0 = (zmm1 * mem) + zmm0
+	LONG $0x48f5b262; WORD $0x04b8; BYTE $0xf6 // vfmadd231pd	(%rsi,%r14,8), %zmm1, %zmm0
 	WORD $0x894d; BYTE $0xd6                   // movq	%r10, %r14
 	LONG $0x08c28349                           // addq	$8, %r10
 	WORD $0xff49; BYTE $0xcb                   // decq	%r11
@@ -955,35 +906,35 @@ BB3_34:
 	LONG $0x48fdf162; WORD $0xc158             // vaddpd	%zmm1, %zmm0, %zmm0
 	LONG $0x197de3c4; WORD $0x01c1             // vextractf128	$1, %ymm0, %xmm1
 	LONG $0xc158f9c5                           // vaddpd	%xmm1, %xmm0, %xmm0
-	LONG $0xc8c6f9c5; BYTE $0x01               // vshufpd	$1, %xmm0, %xmm0, %xmm1         ## xmm1 = xmm0[1,0]
+	LONG $0xc8c6f9c5; BYTE $0x01               // vshufpd	$1, %xmm0, %xmm0, %xmm1
 	LONG $0xc158fbc5                           // vaddsd	%xmm1, %xmm0, %xmm0
 	WORD $0x3949; BYTE $0xc8                   // cmpq	%rcx, %r8
 	JGE  BB3_39
-	LONG $0x24548b4c; BYTE $0x08               // movq	8(%rsp), %r10                   ## 8-byte Reload
+	LONG $0x24548b4c; BYTE $0x08               // movq	8(%rsp), %r10
 	WORD $0x894d; BYTE $0xc6                   // movq	%r8, %r14
 	WORD $0x854d; BYTE $0xd2                   // testq	%r10, %r10
 	JE   BB3_37
 
 BB3_36:
-	LONG $0x107ba1c4; WORD $0xf54c; BYTE $0x00 // vmovsd	(%rbp,%r14,8), %xmm1            ## xmm1 = mem[0],zero
-	LONG $0xb9f1a2c4; WORD $0xf604             // vfmadd231sd	(%rsi,%r14,8), %xmm1, %xmm0 ## xmm0 = (xmm1 * mem) + xmm0
+	LONG $0x107ba1c4; WORD $0xf54c; BYTE $0x00 // vmovsd	(%rbp,%r14,8), %xmm1
+	LONG $0xb9f1a2c4; WORD $0xf604             // vfmadd231sd	(%rsi,%r14,8), %xmm1, %xmm0
 	WORD $0xff49; BYTE $0xc6                   // incq	%r14
 	WORD $0xff49; BYTE $0xca                   // decq	%r10
 	JNE  BB3_36
 
 BB3_37:
-	LONG $0x243c8348; BYTE $0xfc // cmpq	$-4, (%rsp)                     ## 8-byte Folded Reload
+	LONG $0x243c8348; BYTE $0xfc // cmpq	$-4, (%rsp)
 	JA   BB3_39
 
 BB3_38:
-	LONG $0x107ba1c4; WORD $0xf54c; BYTE $0x00 // vmovsd	(%rbp,%r14,8), %xmm1            ## xmm1 = mem[0],zero
-	LONG $0x107ba1c4; WORD $0xf554; BYTE $0x08 // vmovsd	8(%rbp,%r14,8), %xmm2           ## xmm2 = mem[0],zero
-	LONG $0x99f9a2c4; WORD $0xf60c             // vfmadd132sd	(%rsi,%r14,8), %xmm0, %xmm1 ## xmm1 = (xmm1 * mem) + xmm0
-	LONG $0xb9e9a2c4; WORD $0xf64c; BYTE $0x08 // vfmadd231sd	8(%rsi,%r14,8), %xmm2, %xmm1 ## xmm1 = (xmm2 * mem) + xmm1
-	LONG $0x107ba1c4; WORD $0xf554; BYTE $0x10 // vmovsd	16(%rbp,%r14,8), %xmm2          ## xmm2 = mem[0],zero
-	LONG $0x99f1a2c4; WORD $0xf654; BYTE $0x10 // vfmadd132sd	16(%rsi,%r14,8), %xmm1, %xmm2 ## xmm2 = (xmm2 * mem) + xmm1
-	LONG $0x107ba1c4; WORD $0xf544; BYTE $0x18 // vmovsd	24(%rbp,%r14,8), %xmm0          ## xmm0 = mem[0],zero
-	LONG $0x99e9a2c4; WORD $0xf644; BYTE $0x18 // vfmadd132sd	24(%rsi,%r14,8), %xmm2, %xmm0 ## xmm0 = (xmm0 * mem) + xmm2
+	LONG $0x107ba1c4; WORD $0xf54c; BYTE $0x00 // vmovsd	(%rbp,%r14,8), %xmm1
+	LONG $0x107ba1c4; WORD $0xf554; BYTE $0x08 // vmovsd	8(%rbp,%r14,8), %xmm2
+	LONG $0x99f9a2c4; WORD $0xf60c             // vfmadd132sd	(%rsi,%r14,8), %xmm0, %xmm1
+	LONG $0xb9e9a2c4; WORD $0xf64c; BYTE $0x08 // vfmadd231sd	8(%rsi,%r14,8), %xmm2, %xmm1
+	LONG $0x107ba1c4; WORD $0xf554; BYTE $0x10 // vmovsd	16(%rbp,%r14,8), %xmm2
+	LONG $0x99f1a2c4; WORD $0xf654; BYTE $0x10 // vfmadd132sd	16(%rsi,%r14,8), %xmm1, %xmm2
+	LONG $0x107ba1c4; WORD $0xf544; BYTE $0x18 // vmovsd	24(%rbp,%r14,8), %xmm0
+	LONG $0x99e9a2c4; WORD $0xf644; BYTE $0x18 // vfmadd132sd	24(%rsi,%r14,8), %xmm2, %xmm0
 	LONG $0x04c68349                           // addq	$4, %r14
 	WORD $0x394c; BYTE $0xf1                   // cmpq	%r14, %rcx
 	JNE  BB3_38
@@ -996,7 +947,7 @@ BB3_15:
 	JMP  BB3_17
 
 BB3_18:
-	QUAD $0xffffffffffe0be48; WORD $0x7fff // movabsq	$9223372036854775776, %rsi      ## imm = 0x7FFFFFFFFFFFFFE0
+	QUAD $0xffffffffffe0be48; WORD $0x7fff // movabsq	$9223372036854775776, %rsi
 	LONG $0x20f88348                       // cmpq	$32, %rax
 	JAE  BB3_20
 	WORD $0xc931                           // xorl	%ecx, %ecx
@@ -1044,12 +995,5 @@ BB3_26:
 	JNE  BB3_17
 
 BB3_27:
-	LONG $0x20c48348         // addq	$32, %rsp
-	BYTE $0x5b               // popq	%rbx
-	WORD $0x5c41             // popq	%r12
-	WORD $0x5d41             // popq	%r13
-	WORD $0x5e41             // popq	%r14
-	WORD $0x5f41             // popq	%r15
-	BYTE $0x5d               // popq	%rbp
 	WORD $0xf8c5; BYTE $0x77 // vzeroupper
 	RET

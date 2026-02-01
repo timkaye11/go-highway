@@ -14,7 +14,11 @@
 
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"sort"
+	"strings"
+)
 
 // Target represents an architecture-specific code generation target.
 type Target struct {
@@ -32,6 +36,9 @@ type OpInfo struct {
 	SubPackage string // For contrib: "math", "vec", "matvec", "matmul", "algo", "image", "bitpack", "sort"
 	Name       string // Target function/method name
 	IsMethod   bool   // true if a.Add(b), false if Add(a, b)
+	IsInPlace  bool   // true for in-place ops: v.OpAcc(args, &acc) modifies acc, doesn't return
+	AccArg     int    // For in-place ops: which arg index is the accumulator (gets &)
+	InPlaceOf  string // Name of the non-in-place op this replaces (e.g., "MulAdd" for MulAddAcc)
 }
 
 // AVX2Target returns the target configuration for AVX2 (256-bit SIMD).
@@ -48,14 +55,16 @@ func AVX2Target() Target {
 			"int64":        "Int64x4",
 			"uint32":       "Uint32x8",
 			"uint64":       "Uint64x4",
-			"hwy.Float16":  "hwy.Vec[hwy.Float16]",
-			"hwy.BFloat16": "hwy.Vec[hwy.BFloat16]",
+			"hwy.Float16":  "Float16x8AVX2",
+			"hwy.BFloat16": "BFloat16x8AVX2",
 		},
 		OpMap: map[string]OpInfo{
 			// ===== Load/Store operations =====
-			"Load":      {Name: "Load", IsMethod: false},      // archsimd.LoadFloat32x8Slice
-			"Load4":     {Package: "hwy", Name: "Load4", IsMethod: false}, // hwy.Load4_AVX2_Float32 - 4 separate loads
-			"Store":     {Name: "Store", IsMethod: true},      // v.StoreSlice
+			"Load":      {Name: "Load", IsMethod: false},                      // archsimd.LoadFloat32x8Slice
+			"LoadFull":  {Name: "LoadFull", IsMethod: false},                  // archsimd.LoadFloat32x8 (pointer based)
+			"Load4":     {Package: "hwy", Name: "Load4", IsMethod: false},     // hwy.Load4_AVX2_Float32 - 4 separate loads
+			"Store":     {Name: "Store", IsMethod: true},                      // v.StoreSlice
+			"StoreFull": {Name: "StoreFull", IsMethod: true},                  // v.Store (pointer based)
 			"Set":       {Name: "Broadcast", IsMethod: false}, // archsimd.BroadcastFloat32x8
 			"Const":     {Name: "Broadcast", IsMethod: false}, // archsimd.BroadcastFloat32x8 (same as Set)
 			"Zero":      {Package: "special", Name: "Zero", IsMethod: false}, // Use Broadcast(0)
@@ -131,6 +140,10 @@ func AVX2Target() Target {
 			"ReduceMin": {Package: "hwy", Name: "ReduceMin", IsMethod: false},
 			"ReduceMax": {Package: "hwy", Name: "ReduceMax", IsMethod: false},
 
+			// ===== Bit manipulation =====
+			// archsimd doesn't have PopCount method. Using hwy wrapper.
+			"PopCount": {Package: "hwy", Name: "PopCount", IsMethod: false},
+
 			// ===== Comparisons =====
 			// Note: archsimd uses Less/Greater, not LessThan/GreaterThan
 			"Equal":        {Name: "Equal", IsMethod: true},
@@ -144,6 +157,7 @@ func AVX2Target() Target {
 			"Iota":     {Name: "Iota", IsMethod: false},
 			"SignBit":  {Package: "hwy", Name: "SignBit", IsMethod: false},
 			"MaxLanes": {Package: "special", Name: "MaxLanes", IsMethod: false}, // Transformed to constant
+			"NumLanes": {Package: "special", Name: "NumLanes", IsMethod: false}, // Alias for MaxLanes, transformed to constant
 			"Lanes":    {Package: "special", Name: "Lanes", IsMethod: false},    // Transformed to constant
 
 			// ===== Type references (not functions, but parser captures them) =====
@@ -158,8 +172,8 @@ func AVX2Target() Target {
 			"Broadcast":          {Name: "Broadcast", IsMethod: true},
 			"GetLane":            {Package: "hwy", Name: "GetLane", IsMethod: false},
 			"InsertLane":         {Name: "InsertLane", IsMethod: false},
-			"InterleaveLower":    {Name: "InterleaveLower", IsMethod: false},
-			"InterleaveUpper":    {Name: "InterleaveUpper", IsMethod: false},
+			"InterleaveLower":    {Package: "hwy", Name: "InterleaveLower", IsMethod: false},
+			"InterleaveUpper":    {Package: "hwy", Name: "InterleaveUpper", IsMethod: false},
 			"ConcatLowerLower":   {Name: "ConcatLowerLower", IsMethod: false},
 			"ConcatUpperUpper":   {Name: "ConcatUpperUpper", IsMethod: false},
 			"ConcatLowerUpper":   {Name: "ConcatLowerUpper", IsMethod: false},
@@ -251,14 +265,16 @@ func AVX512Target() Target {
 			"int64":        "Int64x8",
 			"uint32":       "Uint32x16",
 			"uint64":       "Uint64x8",
-			"hwy.Float16":  "hwy.Vec[hwy.Float16]",
-			"hwy.BFloat16": "hwy.Vec[hwy.BFloat16]",
+			"hwy.Float16":  "Float16x16AVX512",
+			"hwy.BFloat16": "BFloat16x16AVX512",
 		},
 		OpMap: map[string]OpInfo{
 			// ===== Load/Store operations =====
 			"Load":      {Name: "Load", IsMethod: false},
-			"Load4":     {Package: "hwy", Name: "Load4", IsMethod: false}, // hwy.Load4_AVX512_Float32 - 4 separate loads
+			"LoadFull":  {Name: "LoadFull", IsMethod: false},                  // archsimd.LoadFloat32x16 (pointer based)
+			"Load4":     {Package: "hwy", Name: "Load4", IsMethod: false},     // hwy.Load4_AVX512_Float32 - 4 separate loads
 			"Store":     {Name: "Store", IsMethod: true},
+			"StoreFull": {Name: "StoreFull", IsMethod: true},                  // v.Store (pointer based)
 			"Set":       {Name: "Broadcast", IsMethod: false},
 			"Const":     {Name: "Broadcast", IsMethod: false}, // Same as Set
 			"Zero":      {Package: "special", Name: "Zero", IsMethod: false}, // Use Broadcast(0)
@@ -335,6 +351,10 @@ func AVX512Target() Target {
 			"ReduceMin": {Package: "hwy", Name: "ReduceMin", IsMethod: false},
 			"ReduceMax": {Package: "hwy", Name: "ReduceMax", IsMethod: false},
 
+			// ===== Bit manipulation =====
+			// archsimd doesn't have PopCount method. Using hwy wrapper.
+			"PopCount": {Package: "hwy", Name: "PopCount", IsMethod: false},
+
 			// ===== Comparisons =====
 			// Note: archsimd uses Less/Greater, not LessThan/GreaterThan
 			"Equal":        {Name: "Equal", IsMethod: true},
@@ -348,6 +368,7 @@ func AVX512Target() Target {
 			"Iota":     {Name: "Iota", IsMethod: false},
 			"SignBit":  {Package: "hwy", Name: "SignBit", IsMethod: false},
 			"MaxLanes": {Package: "special", Name: "MaxLanes", IsMethod: false}, // Transformed to constant
+			"NumLanes": {Package: "special", Name: "NumLanes", IsMethod: false}, // Alias for MaxLanes, transformed to constant
 			"Lanes":    {Package: "special", Name: "Lanes", IsMethod: false},    // Transformed to constant
 
 			// ===== Type references (not functions, but parser captures them) =====
@@ -362,8 +383,8 @@ func AVX512Target() Target {
 			"Broadcast":          {Name: "Broadcast", IsMethod: true},
 			"GetLane":            {Package: "hwy", Name: "GetLane", IsMethod: false},
 			"InsertLane":         {Name: "InsertLane", IsMethod: false},
-			"InterleaveLower":    {Name: "InterleaveLower", IsMethod: false},
-			"InterleaveUpper":    {Name: "InterleaveUpper", IsMethod: false},
+			"InterleaveLower":    {Package: "hwy", Name: "InterleaveLower", IsMethod: false},
+			"InterleaveUpper":    {Package: "hwy", Name: "InterleaveUpper", IsMethod: false},
 			"ConcatLowerLower":   {Name: "ConcatLowerLower", IsMethod: false},
 			"ConcatUpperUpper":   {Name: "ConcatUpperUpper", IsMethod: false},
 			"ConcatLowerUpper":   {Name: "ConcatLowerUpper", IsMethod: false},
@@ -462,8 +483,10 @@ func FallbackTarget() Target {
 		OpMap: map[string]OpInfo{
 			// ===== Load/Store operations - use hwy package =====
 			"Load":      {Package: "hwy", Name: "Load", IsMethod: false},
+			"LoadFull":  {Package: "hwy", Name: "LoadFull", IsMethod: false}, // hwy.LoadFull (no bounds checking)
 			"Load4":     {Package: "hwy", Name: "Load4", IsMethod: false}, // hwy.Load4 fallback (4 separate loads)
 			"Store":     {Package: "hwy", Name: "Store", IsMethod: false},
+			"StoreFull": {Package: "hwy", Name: "StoreFull", IsMethod: false}, // hwy.StoreFull (no bounds checking)
 			"Set":       {Package: "hwy", Name: "Set", IsMethod: false},
 			"Zero":      {Package: "hwy", Name: "Zero", IsMethod: false},
 			"MaskLoad":  {Package: "hwy", Name: "MaskLoad", IsMethod: false},
@@ -532,6 +555,9 @@ func FallbackTarget() Target {
 			"ReduceMin": {Package: "hwy", Name: "ReduceMin", IsMethod: false},
 			"ReduceMax": {Package: "hwy", Name: "ReduceMax", IsMethod: false},
 
+			// ===== Bit manipulation =====
+			"PopCount": {Package: "hwy", Name: "PopCount", IsMethod: false},
+
 			// ===== Comparisons =====
 			"Equal":        {Package: "hwy", Name: "Equal", IsMethod: false},
 			"NotEqual":     {Package: "hwy", Name: "NotEqual", IsMethod: false},
@@ -547,6 +573,7 @@ func FallbackTarget() Target {
 			"Iota":     {Package: "hwy", Name: "Iota", IsMethod: false},
 			"SignBit":  {Package: "hwy", Name: "SignBit", IsMethod: false},
 			"MaxLanes": {Package: "special", Name: "MaxLanes", IsMethod: false}, // Transformed to constant
+			"NumLanes": {Package: "special", Name: "NumLanes", IsMethod: false}, // Alias for MaxLanes, transformed to constant
 			"Lanes":    {Package: "special", Name: "Lanes", IsMethod: false},    // Transformed to constant
 
 			// ===== Type references (not functions, but parser captures them) =====
@@ -650,14 +677,16 @@ func NEONTarget() Target {
 			"int64":        "Int64x2",
 			"uint32":       "Uint32x4",
 			"uint64":       "Uint64x2",
-			"hwy.Float16":  "hwy.Vec[hwy.Float16]",
-			"hwy.BFloat16": "hwy.Vec[hwy.BFloat16]",
+			"hwy.Float16":  "Float16x8",  // Use concrete asm type with in-place methods
+			"hwy.BFloat16": "BFloat16x8", // Use concrete asm type with in-place methods
 		},
 		OpMap: map[string]OpInfo{
 			// ===== Load/Store operations =====
 			"Load":      {Name: "Load", IsMethod: false},
-			"Load4":     {Name: "Load4", IsMethod: false}, // asm.Load4Float32x4Slice - single ld1 instruction
+			"LoadFull":  {Name: "LoadFull", IsMethod: false},  // asm.LoadFloat32x4 (pointer based)
+			"Load4":     {Name: "Load4", IsMethod: false},    // asm.Load4Float32x4Slice - single ld1 instruction
 			"Store":     {Name: "Store", IsMethod: true},
+			"StoreFull": {Name: "StoreFull", IsMethod: true}, // v.Store (pointer based)
 			"Set":       {Name: "Broadcast", IsMethod: false},
 			"Const":     {Name: "Broadcast", IsMethod: false}, // Same as Set
 			"Zero":      {Name: "Zero", IsMethod: false},
@@ -686,12 +715,24 @@ func NEONTarget() Target {
 
 			// ===== Core math operations =====
 			"Sqrt":               {Name: "Sqrt", IsMethod: true},
-			"RSqrt":              {Package: "asm", Name: "RSqrt", IsMethod: false},              // asm.RSqrtF32/F64
-			"RSqrtNewtonRaphson": {Package: "asm", Name: "RSqrtNewtonRaphson", IsMethod: false}, // asm.RSqrtNewtonRaphsonF32/F64
-			"RSqrtPrecise":       {Package: "asm", Name: "RSqrtPrecise", IsMethod: false},       // asm.RSqrtPreciseF32/F64
+			"RSqrt":              {Name: "ReciprocalSqrt", IsMethod: true}, // v.ReciprocalSqrt() (~12-bit precision)
+			"RSqrtNewtonRaphson": {Package: "hwy", Name: "RSqrtNewtonRaphson_NEON", IsMethod: false}, // N-R refined
+			"RSqrtPrecise":       {Package: "hwy", Name: "RSqrtPrecise_NEON", IsMethod: false},       // sqrt + div
 			"FMA":                {Name: "MulAdd", IsMethod: true}, // FMA maps to MulAdd in NEON asm
 			"MulAdd":             {Name: "MulAdd", IsMethod: true}, // a.MulAdd(b, c) = a*b + c
 			"Pow":                {Name: "Pow", IsMethod: true},    // v.Pow(exp) = v^exp element-wise
+
+			// ===== In-place operations (NEON allocation-free) =====
+			// These modify the accumulator in-place instead of returning a new value.
+			// Use MulAddAcc instead of MulAdd for inner loops to avoid allocations.
+			"MulAddAcc":  {Name: "MulAddAcc", IsMethod: true, IsInPlace: true, AccArg: 1, InPlaceOf: "MulAdd"},   // v.MulAddAcc(a, &acc): acc += v * a
+			"MulAddInto": {Name: "MulAddInto", IsMethod: true, IsInPlace: true, AccArg: 2, InPlaceOf: "MulAdd"}, // v.MulAddInto(a, b, &result): result = v * a + b
+			"AddInto":    {Name: "AddInto", IsMethod: true, IsInPlace: true, AccArg: 1, InPlaceOf: "Add"},       // v.AddInto(a, &result): result = v + a
+			"SubInto":    {Name: "SubInto", IsMethod: true, IsInPlace: true, AccArg: 1, InPlaceOf: "Sub"},       // v.SubInto(a, &result): result = v - a
+			"MulInto":    {Name: "MulInto", IsMethod: true, IsInPlace: true, AccArg: 1, InPlaceOf: "Mul"},       // v.MulInto(a, &result): result = v * a
+			"DivInto":    {Name: "DivInto", IsMethod: true, IsInPlace: true, AccArg: 1, InPlaceOf: "Div"},       // v.DivInto(a, &result): result = v / a
+			"MinInto":    {Name: "MinInto", IsMethod: true, IsInPlace: true, AccArg: 1, InPlaceOf: "Min"},       // v.MinInto(a, &result): result = min(v, a)
+			"MaxInto":    {Name: "MaxInto", IsMethod: true, IsInPlace: true, AccArg: 1, InPlaceOf: "Max"},       // v.MaxInto(a, &result): result = max(v, a)
 
 			// ===== Rounding operations =====
 			"RoundToEven": {Name: "RoundToEven", IsMethod: true}, // Banker's rounding
@@ -726,6 +767,10 @@ func NEONTarget() Target {
 			"ReduceMin": {Name: "ReduceMin", IsMethod: true},
 			"ReduceMax": {Name: "ReduceMax", IsMethod: true},
 
+			// ===== Bit manipulation =====
+			// asm types don't have PopCount method. Using hwy wrapper.
+			"PopCount": {Package: "hwy", Name: "PopCount", IsMethod: false},
+
 			// ===== Comparisons =====
 			"Equal":        {Name: "Equal", IsMethod: true},
 			"NotEqual":     {Name: "NotEqual", IsMethod: true},
@@ -741,6 +786,7 @@ func NEONTarget() Target {
 			"Iota":     {Name: "Iota", IsMethod: false},
 			"SignBit":  {Name: "SignBit", IsMethod: false},
 			"MaxLanes": {Package: "special", Name: "MaxLanes", IsMethod: false}, // Transformed to constant
+			"NumLanes": {Package: "special", Name: "NumLanes", IsMethod: false}, // Alias for MaxLanes, transformed to constant
 			"Lanes":    {Package: "special", Name: "Lanes", IsMethod: false},    // Transformed to constant
 
 			// ===== Type references (not functions, but parser captures them) =====
@@ -754,8 +800,8 @@ func NEONTarget() Target {
 			"Broadcast":          {Name: "Broadcast", IsMethod: true},
 			"GetLane":            {Name: "Get", IsMethod: true},
 			"InsertLane":         {Name: "InsertLane", IsMethod: false},
-			"InterleaveLower":    {Name: "InterleaveLower", IsMethod: false},
-			"InterleaveUpper":    {Name: "InterleaveUpper", IsMethod: false},
+			"InterleaveLower":    {Package: "hwy", Name: "InterleaveLower", IsMethod: false},
+			"InterleaveUpper":    {Package: "hwy", Name: "InterleaveUpper", IsMethod: false},
 			"ConcatLowerLower":   {Name: "ConcatLowerLower", IsMethod: false},
 			"ConcatUpperUpper":   {Name: "ConcatUpperUpper", IsMethod: false},
 			"ConcatLowerUpper":   {Name: "ConcatLowerUpper", IsMethod: false},
@@ -826,20 +872,31 @@ func NEONTarget() Target {
 	}
 }
 
+// targetRegistry maps target names to their constructor functions.
+var targetRegistry = map[string]func() Target{
+	"avx2":     AVX2Target,
+	"avx512":   AVX512Target,
+	"neon":     NEONTarget,
+	"fallback": FallbackTarget,
+}
+
+// AvailableTargets returns a sorted list of valid target names.
+func AvailableTargets() []string {
+	names := make([]string, 0, len(targetRegistry))
+	for name := range targetRegistry {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
 // GetTarget returns the target configuration for the given name.
 func GetTarget(name string) (Target, error) {
-	switch name {
-	case "avx2":
-		return AVX2Target(), nil
-	case "avx512":
-		return AVX512Target(), nil
-	case "neon":
-		return NEONTarget(), nil
-	case "fallback":
-		return FallbackTarget(), nil
-	default:
-		return Target{}, fmt.Errorf("unknown target: %s (valid: avx2, avx512, neon, fallback)", name)
+	factory, ok := targetRegistry[name]
+	if !ok {
+		return Target{}, fmt.Errorf("unknown target: %s (valid: %s)", name, strings.Join(AvailableTargets(), ", "))
 	}
+	return factory(), nil
 }
 
 // Suffix returns the filename suffix for this target (e.g., "_avx2").
@@ -879,7 +936,12 @@ func (t Target) LanesFor(elemType string) int {
 	case "float64", "int64", "uint64":
 		elemSize = 8
 	case "int16", "uint16", "hwy.Float16", "hwy.BFloat16", "Float16", "BFloat16":
-		elemSize = 2
+		// On AVX2/AVX512, half-precision uses promoted float32 storage
+		if t.Name == "AVX2" || t.Name == "AVX512" {
+			elemSize = 4
+		} else {
+			elemSize = 2
+		}
 	case "int8", "uint8":
 		elemSize = 1
 	default:

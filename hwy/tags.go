@@ -43,7 +43,7 @@ func (ScalableTag[T]) Width() int {
 
 // Name returns the current runtime SIMD target name.
 func (ScalableTag[T]) Name() string {
-	return currentName
+	return currentLevel.String()
 }
 
 // MaxLanes returns the maximum number of lanes for type T

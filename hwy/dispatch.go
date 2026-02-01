@@ -75,11 +75,9 @@ var currentLevel DispatchLevel
 
 // currentWidth is the SIMD register width in bytes for the current level.
 // Set by init() in dispatch_*.go files.
+//
+// For DispatchScalar this is set to 16.
 var currentWidth int
-
-// currentName is the human-readable name of the current SIMD level.
-// Set by init() in dispatch_*.go files.
-var currentName string
 
 // CurrentLevel returns the SIMD instruction set being used.
 func CurrentLevel() DispatchLevel {
@@ -95,7 +93,14 @@ func CurrentWidth() int {
 // CurrentName returns a human-readable name for the current SIMD target.
 // For example: "avx2", "neon", "scalar".
 func CurrentName() string {
-	return currentName
+	return currentLevel.String()
+}
+
+// HasSIMD returns true if hardware SIMD acceleration is available.
+// Returns false when running in scalar fallback mode (e.g., when
+// GOEXPERIMENT=simd is not enabled or HWY_NO_SIMD is set).
+func HasSIMD() bool {
+	return currentLevel != DispatchScalar
 }
 
 // NoSimdEnv checks if the HWY_NO_SIMD environment variable is set.
@@ -146,4 +151,15 @@ func MaxLanes[T Lanes]() int {
 		return 0
 	}
 	return currentWidth / elementSize
+}
+
+// NumLanes returns the number of lanes for type T with the current SIMD width.
+// This is an alias for MaxLanes[T]() for API consistency.
+//
+// For example, with AVX2 (256 bits / 32 bytes):
+//   - float32: 32/4 = 8 lanes
+//   - float64: 32/8 = 4 lanes
+//   - int32: 32/4 = 8 lanes
+func NumLanes[T Lanes]() int {
+	return MaxLanes[T]()
 }

@@ -46,12 +46,14 @@ func init() {
 }
 
 func detectCPUFeatures() {
-	// Without GOEXPERIMENT=simd, we can't use archsimd for CPU detection.
-	// Default to SSE2 which is baseline for all amd64 CPUs.
-	// Build with GOEXPERIMENT=simd for proper AVX2/AVX512 detection.
-	currentLevel = DispatchSSE2
-	currentWidth = 16
-	currentName = "sse2"
+	// Without GOEXPERIMENT=simd, we can't use archsimd for CPU detection, so leave the
+	// current SIMD configured to Scalar.
+	//
+	// Notice, while SSE2 is available on all amd64 CPUs, it's not available without the
+	// simd extenstion, so we don't set it.
+	//
+	// Build with GOEXPERIMENT=simd for proper AVX2/AVX512 detection, or even for SSE2 usage.
+	setScalarMode()
 }
 
 func detectFP16BF16Features() {
@@ -72,7 +74,6 @@ func detectFP16BF16Features() {
 func setScalarMode() {
 	currentLevel = DispatchScalar
 	currentWidth = 16 // Use 16-byte vectors even in scalar mode for consistency
-	currentName = "scalar"
 }
 
 // HasF16C returns true if the CPU supports F16C instructions.

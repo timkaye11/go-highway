@@ -36,8 +36,10 @@ func TestExpTransform(t *testing.T) {
 
 	for i := range input {
 		expected := float32(math.Exp(float64(input[i])))
-		if !closeEnough32(output[i], expected, 1e-4) {
-			t.Errorf("ExpTransform[%d] input=%v: got %v, want %v", i, input[i], output[i], expected)
+		if !relClose32(output[i], expected, 1e-5) {
+			t.Errorf("ExpTransform[%d] input=%v: got %v, want %v (relErr=%v)",
+				i, input[i], output[i], expected,
+				math.Abs(float64(output[i]-expected))/math.Max(math.Abs(float64(expected)), 1e-10))
 		}
 	}
 }
@@ -150,8 +152,10 @@ func TestExpTransform_TailHandling(t *testing.T) {
 
 			for i := range input {
 				expected := float32(math.Exp(float64(input[i])))
-				if !closeEnough32(output[i], expected, 1e-3) {
-					t.Errorf("ExpTransform[%d] size=%d input=%v: got %v, want %v", i, size, input[i], output[i], expected)
+				if !relClose32(output[i], expected, 1e-5) {
+					t.Errorf("ExpTransform[%d] size=%d input=%v: got %v, want %v (relErr=%v)",
+						i, size, input[i], output[i], expected,
+						math.Abs(float64(output[i]-expected))/math.Max(math.Abs(float64(expected)), 1e-10))
 				}
 			}
 		})
@@ -170,6 +174,32 @@ func closeEnough32(a, b, tol float32) bool {
 		diff = -diff
 	}
 	return diff <= tol
+}
+
+// relClose32 checks if two float32 values are within a relative tolerance.
+// For values near zero (|expected| < 1e-6), falls back to absolute comparison.
+// This is necessary for functions like exp whose output magnitude varies widely:
+// at exp(10) ≈ 22026, a float32 ULP is ~0.002, so absolute tolerance 1e-4 is
+// sub-ULP and impossible to satisfy.
+func relClose32(got, expected, relTol float32) bool {
+	if math.IsNaN(float64(got)) && math.IsNaN(float64(expected)) {
+		return true
+	}
+	if math.IsInf(float64(got), 0) && math.IsInf(float64(expected), 0) {
+		return (got > 0) == (expected > 0)
+	}
+	absExp := expected
+	if absExp < 0 {
+		absExp = -absExp
+	}
+	diff := got - expected
+	if diff < 0 {
+		diff = -diff
+	}
+	if absExp < 1e-6 {
+		return diff <= relTol
+	}
+	return diff/absExp <= relTol
 }
 
 // Benchmarks - Transform API (zero allocation)
