@@ -95,9 +95,9 @@ func BaseCompressPartition[T hwy.Lanes](data []T, pivot T) int {
 		capacityL := readL - writeL
 		if capacityL > preloadSize {
 			readR -= lanes
-			v = hwy.LoadFull(data[readR:])
+			v = hwy.Load(data[readR:])
 		} else {
-			v = hwy.LoadFull(data[readL:])
+			v = hwy.Load(data[readL:])
 			readL += lanes
 		}
 
@@ -109,32 +109,32 @@ func BaseCompressPartition[T hwy.Lanes](data []T, pivot T) int {
 		// Double-store: write to both left and right positions
 		// Elements < pivot stay at writeL, elements >= pivot end up at right
 		remaining -= lanes
-		hwy.StoreFull(compressed, data[writeL:])
-		hwy.StoreFull(compressed, data[remaining+writeL:])
+		hwy.Store(compressed, data[writeL:])
+		hwy.Store(compressed, data[remaining+writeL:])
 		writeL += numLess
 	}
 
 	// Process preloaded left vectors
 	for i := 0; i < preloadSize; i += lanes {
-		v := hwy.LoadFull(preloadL[i:])
+		v := hwy.Load(preloadL[i:])
 		maskLess := hwy.LessThan(v, pivotVec)
 		numLess := hwy.CountTrue(maskLess)
 		compressed, _ := hwy.Compress(v, maskLess)
 		remaining -= lanes
-		hwy.StoreFull(compressed, data[writeL:])
-		hwy.StoreFull(compressed, data[remaining+writeL:])
+		hwy.Store(compressed, data[writeL:])
+		hwy.Store(compressed, data[remaining+writeL:])
 		writeL += numLess
 	}
 
 	// Process preloaded right vectors (except last 2 which need buffer)
 	for i := 0; i < preloadSize-2*lanes; i += lanes {
-		v := hwy.LoadFull(preloadR[i:])
+		v := hwy.Load(preloadR[i:])
 		maskLess := hwy.LessThan(v, pivotVec)
 		numLess := hwy.CountTrue(maskLess)
 		compressed, _ := hwy.Compress(v, maskLess)
 		remaining -= lanes
-		hwy.StoreFull(compressed, data[writeL:])
-		hwy.StoreFull(compressed, data[remaining+writeL:])
+		hwy.Store(compressed, data[writeL:])
+		hwy.Store(compressed, data[remaining+writeL:])
 		writeL += numLess
 	}
 
@@ -144,7 +144,7 @@ func BaseCompressPartition[T hwy.Lanes](data []T, pivot T) int {
 	writeR := writeL + remaining
 
 	for i := preloadSize - 2*lanes; i < preloadSize; i += lanes {
-		v := hwy.LoadFull(preloadR[i:])
+		v := hwy.Load(preloadR[i:])
 		maskLess := hwy.LessThan(v, pivotVec)
 		numLess := hwy.CountTrue(maskLess)
 		compressed, _ := hwy.Compress(v, maskLess)

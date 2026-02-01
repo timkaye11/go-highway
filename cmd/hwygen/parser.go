@@ -19,7 +19,6 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"path/filepath"
 	"slices"
 	"strings"
 )
@@ -34,7 +33,6 @@ type ParsedFunc struct {
 	HwyCalls   []HwyCall         // Detected hwy.* and contrib.* calls
 	LoopInfo   *LoopInfo         // Main processing loop info
 	Doc        *ast.CommentGroup // Function documentation
-	Private    bool              // true if base function uses lowercase "base" prefix (generates unexported dispatch)
 }
 
 // TypeParam represents a generic type parameter.
@@ -69,11 +67,10 @@ type HwyCall struct {
 
 // LoopInfo represents information about the main vectorized loop.
 type LoopInfo struct {
-	Iterator   string // "ii", "i", etc.
-	Start      string // "0"
-	End        string // "size", "len(data)"
-	Stride     string // "vOne.NumElements()", "lanes", etc.
-	UnrollHint int    // Explicit unroll factor from //hwy:unroll directive (0 = auto)
+	Iterator string // "ii", "i", etc.
+	Start    string // "0"
+	End      string // "size", "len(data)"
+	Stride   string // "vOne.NumElements()", "lanes", etc.
 }
 
 // TypeSpecificConst represents a constant with type-specific variants.
@@ -112,7 +109,6 @@ type ConditionalBlock struct {
 // ParseResult contains all parsed information from a source file.
 type ParseResult struct {
 	Funcs              []ParsedFunc
-	AllFuncs           map[string]*ParsedFunc        // ALL functions in file, keyed by name (for inlining)
 	PackageName        string
 	TypeSpecificConsts map[string]*TypeSpecificConst // map[base_name]variants
 	ConditionalBlocks  []ConditionalBlock
@@ -130,7 +126,6 @@ func Parse(filename string) (*ParseResult, error) {
 
 	result := &ParseResult{
 		PackageName:        file.Name.Name,
-		AllFuncs:           make(map[string]*ParsedFunc),
 		TypeSpecificConsts: make(map[string]*TypeSpecificConst),
 		FileSet:            fset,
 		Imports:            make(map[string]string),
@@ -147,8 +142,10 @@ func Parse(filename string) (*ParseResult, error) {
 			// Explicit alias: import foo "path/to/bar"
 			localName = imp.Name.Name
 		} else {
-			// Default package name: "math" -> "math"; "path/to/foo" -> "foo"
-			localName = filepath.Base(importPath)
+			// Default: use last component of path
+			// e.g., "math" -> "math", "path/to/foo" -> "foo"
+			parts := strings.Split(importPath, "/")
+			localName = parts[len(parts)-1]
 		}
 
 		// Skip blank imports (import _ "pkg")
@@ -179,29 +176,21 @@ func Parse(filename string) (*ParseResult, error) {
 	// Parse conditional directives from comments
 	result.ConditionalBlocks = parseConditionalDirectives(file, fset)
 
-	// Parse unroll directives from comments
-	unrollDirectives := parseUnrollDirectives(file, fset)
-
 	for _, decl := range file.Decls {
 		funcDecl, ok := decl.(*ast.FuncDecl)
 		if !ok {
 			continue
 		}
 
-		// Skip methods (have a receiver)
-		if funcDecl.Recv != nil {
+		// Only process functions (not methods) that start with "Base"
+		if funcDecl.Recv != nil || !strings.HasPrefix(funcDecl.Name.Name, "Base") {
 			continue
 		}
 
-		name := funcDecl.Name.Name
-		isExportedBase := strings.HasPrefix(name, "Base")
-		isPrivateBase := !isExportedBase && strings.HasPrefix(name, "base")
-
 		pf := ParsedFunc{
-			Name:    name,
-			Body:    funcDecl.Body,
-			Doc:     funcDecl.Doc,
-			Private: isPrivateBase,
+			Name: funcDecl.Name.Name,
+			Body: funcDecl.Body,
+			Doc:  funcDecl.Doc,
 		}
 
 		// Extract type parameters
@@ -249,52 +238,22 @@ func Parse(filename string) (*ParseResult, error) {
 		// Find hwy.* and contrib.* calls
 		pf.HwyCalls = findHwyCalls(funcDecl.Body)
 
-		// Detect main vectorized loop (with unroll directive support)
-		pf.LoopInfo = detectLoopWithUnroll(funcDecl.Body, fset, unrollDirectives)
+		// Detect main vectorized loop
+		pf.LoopInfo = detectLoop(funcDecl.Body)
 
-		// Store ALL functions in AllFuncs for potential inlining
-		pfCopy := pf // Make a copy since pf is reused
-		result.AllFuncs[name] = &pfCopy
-
-		// Only add Base*/base* functions to Funcs for code generation
 		// Include functions that use hwy operations OR have hwy.Lanes type parameters
 		// (generic functions with hwy.Lanes need type specialization even without hwy ops)
-		if isExportedBase || isPrivateBase {
-			hasHwyLanesTypeParam := hasHwyLanesConstraint(pf.TypeParams)
-			if len(pf.HwyCalls) > 0 || hasHwyLanesTypeParam {
-				result.Funcs = append(result.Funcs, pf)
-			}
+		hasHwyLanesTypeParam := hasHwyLanesConstraint(pf.TypeParams)
+		if len(pf.HwyCalls) > 0 || hasHwyLanesTypeParam {
+			result.Funcs = append(result.Funcs, pf)
 		}
 	}
 
 	return result, nil
 }
 
-// hasBasePrefix returns true if the name starts with "Base" or "base".
-func hasBasePrefix(name string) bool {
-	return strings.HasPrefix(name, "Base") || strings.HasPrefix(name, "base")
-}
-
-// isBuiltinOrCommon returns true if the name is a built-in function or common identifier
-// that should not be tracked as a local helper function.
-// Uses go/ast's IsExported as a heuristic: unexported names starting with lowercase
-// that aren't in our AllFuncs map are likely local helpers we should track.
-// For the initial parsing pass, we track ALL potential local function calls and filter
-// later when we have the full AllFuncs map.
-func isBuiltinOrCommon(name string) bool {
-	// Built-in functions from Go spec (these are the only ones that need explicit listing)
-	// https://pkg.go.dev/builtin
-	builtins := map[string]bool{
-		"append": true, "cap": true, "clear": true, "close": true, "complex": true,
-		"copy": true, "delete": true, "imag": true, "len": true, "make": true,
-		"max": true, "min": true, "new": true, "panic": true, "print": true,
-		"println": true, "real": true, "recover": true,
-	}
-	return builtins[name]
-}
-
 // findHwyCalls walks the AST and finds all hwy.* and contrib.* calls and references.
-// Also detects calls to Base*/base* functions and local helper functions within the same package.
+// Also detects calls to Base* functions within the same package.
 func findHwyCalls(node ast.Node) []HwyCall {
 	var calls []HwyCall
 	seen := make(map[string]bool) // Avoid duplicates
@@ -305,38 +264,29 @@ func findHwyCalls(node ast.Node) []HwyCall {
 
 		switch expr := n.(type) {
 		case *ast.CallExpr:
-			// Check for same-package function calls (both Base* and non-Base* helpers)
+			// Check for same-package Base* function calls
 			if ident, ok := expr.Fun.(*ast.Ident); ok {
-				// Skip built-in functions and common identifiers
-				if !isBuiltinOrCommon(ident.Name) {
-					pkg := "localHelper"
-					if hasBasePrefix(ident.Name) {
-						pkg = "local" // Existing behavior for Base* functions
-					}
-					key := pkg + "." + ident.Name
+				if strings.HasPrefix(ident.Name, "Base") {
+					key := "local." + ident.Name
 					if !seen[key] {
 						seen[key] = true
 						calls = append(calls, HwyCall{
-							Package:  pkg,
+							Package:  "local",
 							FuncName: ident.Name,
 							Position: expr.Pos(),
 						})
 					}
 				}
 			}
-			// Check for same-package generic function calls: func[T](...)
+			// Check for same-package generic Base* function calls: BaseApply[T](...)
 			if indexExpr, ok := expr.Fun.(*ast.IndexExpr); ok {
 				if ident, ok := indexExpr.X.(*ast.Ident); ok {
-					if !isBuiltinOrCommon(ident.Name) {
-						pkg := "localHelper"
-						if hasBasePrefix(ident.Name) {
-							pkg = "local"
-						}
-						key := pkg + "." + ident.Name
+					if strings.HasPrefix(ident.Name, "Base") {
+						key := "local." + ident.Name
 						if !seen[key] {
 							seen[key] = true
 							calls = append(calls, HwyCall{
-								Package:  pkg,
+								Package:  "local",
 								FuncName: ident.Name,
 								Position: expr.Pos(),
 							})
@@ -406,41 +356,10 @@ func findHwyCalls(node ast.Node) []HwyCall {
 	return calls
 }
 
-// UnrollDirective represents a parsed //hwy:unroll directive.
-type UnrollDirective struct {
-	Line   int // Line number of the directive
-	Factor int // Unroll factor (1 = no unroll, 0 = disable)
-}
-
-// parseUnrollDirectives parses //hwy:unroll N comments from the file.
-func parseUnrollDirectives(file *ast.File, fset *token.FileSet) []UnrollDirective {
-	var directives []UnrollDirective
-
-	for _, cg := range file.Comments {
-		for _, c := range cg.List {
-			text := strings.TrimSpace(strings.TrimPrefix(c.Text, "//"))
-			line := fset.Position(c.Pos()).Line
-
-			if after, ok := strings.CutPrefix(text, "hwy:unroll "); ok {
-				factor := 0
-				if _, err := fmt.Sscanf(after, "%d", &factor); err == nil {
-					directives = append(directives, UnrollDirective{
-						Line:   line,
-						Factor: factor,
-					})
-				}
-			}
-		}
-	}
-
-	return directives
-}
-
-// detectLoopWithUnroll attempts to find the main vectorized loop pattern
-// and also checks for //hwy:unroll directives.
+// detectLoop attempts to find the main vectorized loop pattern.
 // Looks for: for ii := 0; ii < size; ii += stride
 // Skips auxiliary loops that only contain Store operations (like zeroing loops).
-func detectLoopWithUnroll(body *ast.BlockStmt, fset *token.FileSet, unrollDirectives []UnrollDirective) *LoopInfo {
+func detectLoop(body *ast.BlockStmt) *LoopInfo {
 	if body == nil {
 		return nil
 	}
@@ -461,18 +380,6 @@ func detectLoopWithUnroll(body *ast.BlockStmt, fset *token.FileSet, unrollDirect
 						info.Iterator = ident.Name
 					}
 					info.Start = exprToString(assignStmt.Rhs[0])
-				}
-			}
-		}
-
-		// If no init (iterator declared before loop), try to get iterator from Post
-		// Pattern: for ; i+lanes <= n; i += lanes
-		if info.Iterator == "" && forStmt.Post != nil {
-			if assignStmt, ok := forStmt.Post.(*ast.AssignStmt); ok {
-				if len(assignStmt.Lhs) == 1 {
-					if ident, ok := assignStmt.Lhs[0].(*ast.Ident); ok {
-						info.Iterator = ident.Name
-					}
 				}
 			}
 		}
@@ -512,17 +419,6 @@ func detectLoopWithUnroll(body *ast.BlockStmt, fset *token.FileSet, unrollDirect
 		}
 
 		if info.Iterator != "" && info.End != "" && isSimdLoop {
-			// Check for //hwy:unroll directive on the line before the loop
-			if fset != nil {
-				loopLine := fset.Position(forStmt.Pos()).Line
-				for _, ud := range unrollDirectives {
-					// Directive should be on the line immediately before the loop
-					if ud.Line == loopLine-1 || ud.Line == loopLine-2 {
-						info.UnrollHint = ud.Factor
-						break
-					}
-				}
-			}
 			return info
 		}
 	}

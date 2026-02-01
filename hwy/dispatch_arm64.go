@@ -41,6 +41,7 @@ func init() {
 	if NoSimdEnv() {
 		currentLevel = DispatchScalar
 		currentWidth = 16
+		currentName = "scalar"
 		return
 	}
 
@@ -53,10 +54,12 @@ func init() {
 	if cpu.ARM64.HasASIMD {
 		currentLevel = DispatchNEON
 		currentWidth = 16 // NEON is 128-bit (16 bytes)
+		currentName = "neon"
 	} else {
 		// Fallback to scalar (should never happen on ARMv8+)
 		currentLevel = DispatchScalar
 		currentWidth = 16
+		currentName = "scalar"
 	}
 
 	// SME support (Apple M4+)
@@ -64,12 +67,14 @@ func init() {
 	if hasSME && os.Getenv("HWY_NO_SME") == "" {
 		currentLevel = DispatchSME
 		currentWidth = 64 // SME streaming vector length is 512-bit (64 bytes) on M4
+		currentName = "sme"
 	}
 
 	// Future: SVE support (without SME streaming mode)
 	// if cpu.ARM64.HasSVE {
 	//     currentLevel = DispatchSVE
 	//     currentWidth = ... // SVE width is variable
+	//     currentName = "sve"
 	// }
 
 	// Detect FP16/BF16 features
@@ -86,8 +91,9 @@ func detectARMFP16BF16Features() {
 	// ARM BF16 detection
 	// golang.org/x/sys/cpu doesn't have explicit BF16 detection yet
 	// BF16 (FEAT_BF16) was introduced in ARMv8.6-A
-	// On macOS/Apple Silicon, we detect via sysctl (see bf16_detect_darwin.go)
-	hasARMBF16 = hasBF16Darwin
+	// For now, we leave this as false until x/sys/cpu adds support
+	// Note: On macOS/Apple Silicon, we could use sysctl for detection
+	hasARMBF16 = false
 }
 
 // HasARMFP16 returns true if the CPU supports ARM FP16 extension.

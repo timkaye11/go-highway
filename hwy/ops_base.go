@@ -29,27 +29,6 @@ func Load[T Lanes](src []T) Vec[T] {
 	return Vec[T]{data: data}
 }
 
-// LoadFull loads a full vector from a slice without bounds checking.
-// PRECONDITION: len(src) >= NumLanes[T](). This is NOT checked at runtime.
-//
-// This function is optimized for performance-critical inner loops where the
-// caller guarantees the slice has sufficient length. Using LoadFull avoids
-// the bounds checking overhead that LoadSlice variants in archsimd incur.
-//
-// For SIMD targets, this translates to pointer-based loads:
-//
-//	archsimd.LoadFloat32x8((*[8]float32)(unsafe.Pointer(&src[0])))
-//
-// WARNING: Passing a slice with len(src) < NumLanes[T]() is undefined behavior.
-func LoadFull[T Lanes](src []T) Vec[T] {
-	n := NumLanes[T]()
-	data := make([]T, n)
-	// Use unsafe.Pointer to avoid bounds checking in inner loop
-	// The caller guarantees len(src) >= n
-	copy(data, src[:n])
-	return Vec[T]{data: data}
-}
-
 // Load4 loads 4 consecutive vectors from a slice for 4x loop unrolling.
 // On ARM NEON, this maps to a single ld1 instruction with 4 registers,
 // which is more efficient than 4 separate Load calls.
@@ -82,26 +61,7 @@ func Store[T Lanes](v Vec[T], dst []T) {
 	copy(dst[:n], v.data[:n])
 }
 
-// StoreFull stores a full vector to a slice without bounds checking.
-// PRECONDITION: len(dst) >= NumLanes[T](). This is NOT checked at runtime.
-//
-// This function is optimized for performance-critical inner loops where the
-// caller guarantees the slice has sufficient length. Using StoreFull avoids
-// the bounds checking overhead that StoreSlice variants in archsimd incur.
-//
-// For SIMD targets, this translates to pointer-based stores:
-//
-//	v.Store((*[8]float32)(unsafe.Pointer(&dst[0])))
-//
-// WARNING: Passing a slice with len(dst) < NumLanes[T]() is undefined behavior.
-func StoreFull[T Lanes](v Vec[T], dst []T) {
-	// The caller guarantees len(dst) >= len(v.data)
-	copy(dst[:len(v.data)], v.data)
-}
-
-// Set returns a vector with all lanes set to the given value.
-// For creating vectors from float literals without explicit type conversion,
-// use [Const] which accepts float32 and handles type conversion automatically.
+// Set creates a vector with all lanes set to the same value.
 func Set[T Lanes](value T) Vec[T] {
 	n := MaxLanes[T]()
 	data := make([]T, n)
@@ -111,14 +71,9 @@ func Set[T Lanes](value T) Vec[T] {
 	return Vec[T]{data: data}
 }
 
-// Const returns a vector with all lanes set to the given float32 constant.
-// Unlike [Set], Const accepts a float32 and converts it to type T, making it
-// convenient for use with float literals: hwy.Const[T](0.5).
-// For Float16/BFloat16, the conversion goes through the appropriate hardware
-// or software conversion path.
-//
-// Note: for float64 targets, the code generator transforms Const calls with
-// literal arguments to Set calls, avoiding precision loss through float32.
+// Const creates a vector with all lanes set to the given float32 constant.
+// This allows writing generic code without T(constant) conversions.
+// Usage: hwy.Const[T](1.0) creates a Vec[T] with all lanes set to 1.0
 func Const[T Lanes](val float32) Vec[T] {
 	return Set(ConstValue[T](val))
 }
@@ -132,6 +87,7 @@ func ConstValue[T Lanes](val float32) T {
 	case BFloat16:
 		return any(Float32ToBFloat16(val)).(T)
 	}
+	// Native types support direct conversion from float32
 	return T(val)
 }
 

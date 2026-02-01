@@ -20,12 +20,10 @@ import (
 	"math"
 	"math/rand"
 	"testing"
-
-	"github.com/ajroetker/go-highway/hwy/contrib/matmul/asm"
 )
 
-// TestBlockMulAddNEONF32 tests the hand-written NEON assembly version.
-func TestBlockMulAddNEONF32(t *testing.T) {
+// TestBlockMulAddNEON tests the hand-written NEON assembly version.
+func TestBlockMulAddNEON(t *testing.T) {
 	blockSizes := []int{8, 16, 32, 48, 64}
 
 	for _, blockDim := range blockSizes {
@@ -50,7 +48,7 @@ func TestBlockMulAddNEONF32(t *testing.T) {
 
 			aT := transposeBlock(a, blockDim)
 			referenceBlockMulAdd(aT, b, expected, blockDim)
-			asm.BlockMulAddNEONF32(aT, b, c, blockDim)
+			BlockMulAddNEON(aT, b, c, blockDim)
 
 			var maxErr float32
 			for i := range c {
@@ -62,7 +60,7 @@ func TestBlockMulAddNEONF32(t *testing.T) {
 
 			tolerance := float32(1e-4) * float32(blockDim)
 			if maxErr > tolerance {
-				t.Errorf("BlockMulAddNEONF32: max error %e exceeds tolerance %e", maxErr, tolerance)
+				t.Errorf("BlockMulAddNEON: max error %e exceeds tolerance %e", maxErr, tolerance)
 			} else {
 				t.Logf("blockDim=%d: max error %e", blockDim, maxErr)
 			}
@@ -70,8 +68,8 @@ func TestBlockMulAddNEONF32(t *testing.T) {
 	}
 }
 
-// TestBlockMulAddNEONF64 tests the float64 NEON assembly version.
-func TestBlockMulAddNEONF64(t *testing.T) {
+// TestBlockMulAddNEONFloat64 tests the float64 NEON assembly version.
+func TestBlockMulAddNEONFloat64(t *testing.T) {
 	blockSizes := []int{8, 16, 32, 48, 64}
 
 	for _, blockDim := range blockSizes {
@@ -96,7 +94,7 @@ func TestBlockMulAddNEONF64(t *testing.T) {
 
 			aT := transposeBlockFloat64(a, blockDim)
 			referenceBlockMulAddFloat64(aT, b, expected, blockDim)
-			asm.BlockMulAddNEONF64(aT, b, c, blockDim)
+			BlockMulAddNEONFloat64(aT, b, c, blockDim)
 
 			var maxErr float64
 			for i := range c {
@@ -108,7 +106,7 @@ func TestBlockMulAddNEONF64(t *testing.T) {
 
 			tolerance := 1e-10 * float64(blockDim)
 			if maxErr > tolerance {
-				t.Errorf("BlockMulAddNEONF64: max error %e exceeds tolerance %e", maxErr, tolerance)
+				t.Errorf("BlockMulAddNEONFloat64: max error %e exceeds tolerance %e", maxErr, tolerance)
 			} else {
 				t.Logf("blockDim=%d: max error %e", blockDim, maxErr)
 			}
@@ -144,8 +142,8 @@ func referenceBlockMulAddFloat64(aT, b, c []float64, blockDim int) {
 	}
 }
 
-// BenchmarkBlockMulAddNEONF32 benchmarks the hand-written NEON assembly.
-func BenchmarkBlockMulAddNEONF32(b *testing.B) {
+// BenchmarkBlockMulAddNEON benchmarks the hand-written NEON assembly.
+func BenchmarkBlockMulAddNEON(b *testing.B) {
 	blockSizes := []int{32, 48, 64}
 
 	for _, blockDim := range blockSizes {
@@ -167,7 +165,7 @@ func BenchmarkBlockMulAddNEONF32(b *testing.B) {
 		b.Run(sizeStr(blockDim)+"/NEON", func(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				asm.BlockMulAddNEONF32(aT, bMat, c, blockDim)
+				BlockMulAddNEON(aT, bMat, c, blockDim)
 			}
 			b.StopTimer()
 			elapsed := b.Elapsed().Seconds()

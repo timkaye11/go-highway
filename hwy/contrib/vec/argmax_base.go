@@ -51,7 +51,7 @@ func BaseArgmax[T hwy.Floats](v []T) int {
 	// Process remaining full vectors
 	i := lanes
 	for ; i+lanes <= len(v); i += lanes {
-		vals := hwy.LoadFull(v[i:])
+		vals := hwy.Load(v[i:])
 		// Current indices: base + iota
 		curIdxs := hwy.Add(hwy.Set(T(i)), hwy.Iota[T]())
 
@@ -129,7 +129,7 @@ func BaseArgmin[T hwy.Floats](v []T) int {
 	// Process remaining full vectors
 	i := lanes
 	for ; i+lanes <= len(v); i += lanes {
-		vals := hwy.LoadFull(v[i:])
+		vals := hwy.Load(v[i:])
 		// Current indices: base + iota
 		curIdxs := hwy.Add(hwy.Set(T(i)), hwy.Iota[T]())
 
@@ -177,39 +177,27 @@ func BaseArgmin[T hwy.Floats](v []T) int {
 }
 
 // scalarArgmax is the scalar fallback for small slices.
-// NaN values are treated as less than all other values, matching the SIMD path.
 func scalarArgmax[T hwy.Floats](v []T) int {
-	bestIdx := 0
-	var maxVal T
-	foundValid := false
-	for i := 0; i < len(v); i++ {
-		if v[i] != v[i] {
-			continue // skip NaN
-		}
-		if !foundValid || v[i] > maxVal || (v[i] == maxVal && i < bestIdx) {
+	maxIdx := 0
+	maxVal := v[0]
+	for i := 1; i < len(v); i++ {
+		if v[i] > maxVal {
 			maxVal = v[i]
-			bestIdx = i
-			foundValid = true
+			maxIdx = i
 		}
 	}
-	return bestIdx
+	return maxIdx
 }
 
 // scalarArgmin is the scalar fallback for small slices.
-// NaN values are treated as greater than all other values, matching the SIMD path.
 func scalarArgmin[T hwy.Floats](v []T) int {
-	bestIdx := 0
-	var minVal T
-	foundValid := false
-	for i := 0; i < len(v); i++ {
-		if v[i] != v[i] {
-			continue // skip NaN
-		}
-		if !foundValid || v[i] < minVal || (v[i] == minVal && i < bestIdx) {
+	minIdx := 0
+	minVal := v[0]
+	for i := 1; i < len(v); i++ {
+		if v[i] < minVal {
 			minVal = v[i]
-			bestIdx = i
-			foundValid = true
+			minIdx = i
 		}
 	}
-	return bestIdx
+	return minIdx
 }

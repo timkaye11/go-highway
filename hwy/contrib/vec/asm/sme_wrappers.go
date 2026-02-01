@@ -20,8 +20,6 @@ package asm
 
 import (
 	"unsafe"
-
-	"github.com/ajroetker/go-highway/hwy"
 )
 
 // -march=armv9-a+sme enables SME streaming mode support
@@ -50,7 +48,6 @@ func BatchDotSME(query []float32, data []float32, dots []float32, count, dims in
 	if len(data) < count*dims || len(dots) < count || len(query) < dims {
 		return
 	}
-	defer hwy.SMEGuard()()
 	countVal := int64(count)
 	dimsVal := int64(dims)
 	batch_dot_sme_f32(
@@ -70,7 +67,6 @@ func BatchDotSME64(query []float64, data []float64, dots []float64, count, dims 
 	if len(data) < count*dims || len(dots) < count || len(query) < dims {
 		return
 	}
-	defer hwy.SMEGuard()()
 	countVal := int64(count)
 	dimsVal := int64(dims)
 	batch_dot_sme_f64(
@@ -105,7 +101,6 @@ func BatchL2SquaredSME(query []float32, data []float32, distances []float32, cou
 	if len(data) < count*dims || len(distances) < count || len(query) < dims {
 		return
 	}
-	defer hwy.SMEGuard()()
 	countVal := int64(count)
 	dimsVal := int64(dims)
 	batch_l2_squared_sme_f32(
@@ -125,7 +120,6 @@ func BatchL2SquaredSME64(query []float64, data []float64, distances []float64, c
 	if len(data) < count*dims || len(distances) < count || len(query) < dims {
 		return
 	}
-	defer hwy.SMEGuard()()
 	countVal := int64(count)
 	dimsVal := int64(dims)
 	batch_l2_squared_sme_f64(
