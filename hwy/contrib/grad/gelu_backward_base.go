@@ -51,23 +51,16 @@ func BaseGELUBackward[T hwy.Floats](gradOutput, savedInput, gradInput []T) {
 		x := hwy.Load(savedInput[ii:])
 		gIn := hwy.Load(gradInput[ii:])
 
-		// erf(x / sqrt(2))
 		xScaled := hwy.Mul(x, vInvSqrt2)
 		erfX := math.BaseErfVec(xScaled)
-
-		// term1 = 0.5 * (1 + erf(x/√2))
 		term1 := hwy.Mul(vHalf, hwy.Add(vOne, erfX))
 
-		// term2 = x * (1/√(2π)) * exp(-x²/2)
 		xSq := hwy.Mul(x, x)
 		negHalfXSq := hwy.Mul(vNegHalf, xSq)
 		expTerm := math.BaseExpVec(negHalfXSq)
 		term2 := hwy.Mul(x, hwy.Mul(vInvSqrt2Pi, expTerm))
 
-		// dGELU/dx = term1 + term2
 		dGelu := hwy.Add(term1, term2)
-
-		// Accumulate: gradInput += gradOutput * dGELU/dx
 		result := hwy.MulAdd(gOut, dGelu, gIn)
 		hwy.Store(result, gradInput[ii:])
 	}

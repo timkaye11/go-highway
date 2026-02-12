@@ -44,15 +44,6 @@ func DenseBackwardAuto[T hwy.Floats](
 	batchSize, inFeatures, outFeatures int,
 ) {
 	// gradInput += gradOutput @ weight
-	// gradOutput is [batch, outF], weight is [outF, inF]
-	// MatMulKLastAuto computes A @ B^T where A[M,K], B[N,K]
-	// We want gradOutput[batch, outF] @ weight[outF, inF]
-	// = MatMulAuto(gradOutput[batch, outF], weight^T[inF, outF], ..., batch, inF, outF)
-	// But weight is [outF, inF], so weight^T is [inF, outF].
-	// MatMulAuto(A, B, C, m, n, k): C[m,n] = A[m,k] @ B[k,n]
-	// We need: gradInput[batch, inF] += gradOutput[batch, outF] @ weight[outF, inF]
-	// This is: C[batch, inF] = A[batch, outF] @ B[outF, inF]
-	// => m=batch, n=inF, k=outF, A=gradOutput, B=weight
 	if gradInput != nil {
 		temp := make([]T, batchSize*inFeatures)
 		matmul.MatMulAuto(pool, gradOutput, weight, temp, batchSize, inFeatures, outFeatures)
@@ -60,9 +51,6 @@ func DenseBackwardAuto[T hwy.Floats](
 	}
 
 	// gradWeight += gradOutput^T @ x
-	// gradOutput^T is [outF, batch], x is [batch, inF]
-	// C[outF, inF] = gradOutput^T[outF, batch] @ x[batch, inF]
-	// => m=outF, n=inF, k=batch
 	if gradWeight != nil {
 		gradOutputT := make([]T, outFeatures*batchSize)
 		matmul.TransposeAuto(pool, gradOutput, batchSize, outFeatures, gradOutputT)
@@ -79,7 +67,7 @@ func DenseBackwardAuto[T hwy.Floats](
 }
 
 // biasGradSum computes column-wise sum: gradBias[j] += Σ_i data[i*cols + j].
-func biasGradSum[T hwy.Floats](pool *workerpool.Pool, data, gradBias []T, rows, cols int) {
+func biasGradSum[T hwy.Floats](_ *workerpool.Pool, data, gradBias []T, rows, cols int) {
 	lanes := hwy.MaxLanes[T]()
 	for i := range rows {
 		off := i * cols

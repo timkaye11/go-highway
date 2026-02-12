@@ -138,10 +138,6 @@ func TestIntegration_TransformerBlock(t *testing.T) {
 	for b := range batchSize {
 		for h := range numHeads {
 			idx := b*numHeads + h
-			qOff := (b*seqLen)*dModel + h*headDim
-			kOff := qOff
-			vOff := qOff
-			oOff := qOff
 
 			// Extract per-head slices (interleaved layout)
 			qh := make([]float32, seqLen*headDim)
@@ -168,10 +164,6 @@ func TestIntegration_TransformerBlock(t *testing.T) {
 				dstOff := (b*seqLen+s)*dModel + h*headDim
 				copy(attnOut[dstOff:dstOff+headDim], oh[s*headDim:(s+1)*headDim])
 			}
-			_ = qOff
-			_ = kOff
-			_ = vOff
-			_ = oOff
 		}
 	}
 

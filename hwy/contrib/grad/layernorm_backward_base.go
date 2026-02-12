@@ -59,11 +59,8 @@ func BaseLayerNormBackward[T hwy.Floats](
 		off := g * normSize
 		invStd := savedInvStd[g]
 
-		// Pass 1: Compute dy_gamma, and accumulate sums for mean_dg, mean_dg_xh
-		// Also accumulate gradGamma and gradBeta
 		sumDG := hwy.Zero[T]()
 		sumDGXH := hwy.Zero[T]()
-		vInvN := hwy.Set(invN)
 
 		ii := 0
 		if gamma != nil {
@@ -177,7 +174,5 @@ func BaseLayerNormBackward[T hwy.Floats](
 				gradInput[off+i] += invStd * term
 			}
 		}
-
-		_ = vInvN // suppress unused
 	}
 }

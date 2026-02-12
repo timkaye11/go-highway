@@ -27,9 +27,9 @@ import (
 //
 // Backward:
 //
-//	dB += scale * h^T @ gradOutput         [rank, dOut]   where h = x @ A^T
-//	dA += scale * x^T @ (gradOutput @ B)   [dIn, rank]    (transposed to match A layout)
-//	dX += gradOutput @ W^T + scale * (gradOutput @ B) @ A^T   [batch, dIn]
+//	dB += scale * gradOutput^T @ h         [dOut, rank]   where h = x @ A^T
+//	dA += scale * goB^T @ x               [rank, dIn]    where goB = gradOutput @ B
+//	dX += gradOutput @ W + scale * goB @ A [batch, dIn]
 //
 // Parameters:
 //   - gradOutput: [batchSize, dOut]
@@ -50,11 +50,7 @@ func LoRABackwardAuto[T hwy.Floats](
 	gradX, gradA, gradB []T,
 	batchSize, dIn, dOut, rank int,
 ) {
-	// dB += scale * h^T @ gradOutput
-	// h is [batch, rank], h^T is [rank, batch]
-	// h^T @ gradOutput[batch, dOut] => [rank, dOut]
-	// But B is stored as [dOut, rank], so we need gradB in [dOut, rank] format.
-	// Actually: dB[dOut, rank] += scale * gradOutput^T[dOut, batch] @ h[batch, rank]
+	// dB += scale * gradOutput^T @ h
 	if gradB != nil {
 		goT := make([]T, dOut*batchSize)
 		matmul.TransposeAuto(pool, gradOutput, batchSize, dOut, goT)
@@ -63,20 +59,14 @@ func LoRABackwardAuto[T hwy.Floats](
 		vec.MulConstAddTo(gradB, scale, temp)
 	}
 
-	// Shared computation: gradOutput @ B = gradOutput[batch, dOut] @ B[dOut, rank]
-	// MatMulAuto: C[m,n] = A[m,k] @ B[k,n]
-	// We need: result[batch, rank] = gradOutput[batch, dOut] @ B^T_col[dOut, rank]
-	// B is [dOut, rank], this is already A[m,k] @ B[k,n] with m=batch, k=dOut, n=rank
+	// goB = gradOutput @ B (shared by dA and dX)
 	var goB []T
 	if gradA != nil || gradX != nil {
 		goB = make([]T, batchSize*rank)
 		matmul.MatMulAuto(pool, gradOutput, B, goB, batchSize, rank, dOut)
 	}
 
-	// dA += scale * x^T @ goB
-	// x^T is [dIn, batch], goB is [batch, rank]
-	// => [dIn, rank], but A is [rank, dIn], so we need result in [rank, dIn].
-	// Compute: goB^T[rank, batch] @ x[batch, dIn] => [rank, dIn]
+	// dA += scale * goB^T @ x
 	if gradA != nil {
 		goBT := make([]T, rank*batchSize)
 		matmul.TransposeAuto(pool, goB, batchSize, rank, goBT)
@@ -85,18 +75,13 @@ func LoRABackwardAuto[T hwy.Floats](
 		vec.MulConstAddTo(gradA, scale, temp)
 	}
 
-	// dX += gradOutput @ W^T + scale * goB @ A^T
-	// gradOutput @ W: gradOutput[batch, dOut], W[dOut, dIn]
-	// MatMulAuto: C[m,n] = A[m,k] @ B[k,n]
-	// => temp1[batch, dIn] = gradOutput[batch, dOut] @ W[dOut, dIn] (m=batch, n=dIn, k=dOut)
+	// dX += gradOutput @ W + scale * goB @ A
 	if gradX != nil {
 		temp1 := make([]T, batchSize*dIn)
 		matmul.MatMulAuto(pool, gradOutput, W, temp1, batchSize, dIn, dOut)
 		vec.Add(gradX, temp1)
 
-		// scale * goB @ A^T
-		// goB[batch, rank], A[rank, dIn]
-		// goB @ A = MatMulAuto(goB, A, temp2, batch, dIn, rank)
+		// scale * goB @ A
 		temp2 := make([]T, batchSize*dIn)
 		matmul.MatMulAuto(pool, goB, A, temp2, batchSize, dIn, rank)
 		vec.MulConstAddTo(gradX, scale, temp2)

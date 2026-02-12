@@ -45,22 +45,11 @@ func BaseSiLUBackward[T hwy.Floats](gradOutput, savedInput, gradInput []T) {
 		x := hwy.Load(savedInput[ii:])
 		gIn := hwy.Load(gradInput[ii:])
 
-		// σ(x) = sigmoid(x)
 		sigX := math.BaseSigmoidVec(x)
-
-		// 1 - σ(x)
 		oneMinusSig := hwy.Sub(vOne, sigX)
-
-		// x * (1 - σ(x))
 		xTimesTerm := hwy.Mul(x, oneMinusSig)
-
-		// 1 + x * (1 - σ(x))
 		innerTerm := hwy.Add(vOne, xTimesTerm)
-
-		// dSiLU/dx = σ(x) * (1 + x * (1 - σ(x)))
 		dSilu := hwy.Mul(sigX, innerTerm)
-
-		// Accumulate: gradInput += gradOutput * dSiLU/dx
 		result := hwy.MulAdd(gOut, dSilu, gIn)
 		hwy.Store(result, gradInput[ii:])
 	}

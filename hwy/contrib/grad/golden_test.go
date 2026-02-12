@@ -21,6 +21,26 @@ import (
 	"github.com/ajroetker/go-highway/hwy/contrib/workerpool"
 )
 
+// mustDim retrieves a dimension from golden data, failing the test if absent.
+func mustDim(t *testing.T, gd *gradcheck.GoldenData, name string) int {
+	t.Helper()
+	v, err := gd.GetDim(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return v
+}
+
+// mustArray retrieves an array from golden data, failing the test if absent.
+func mustArray(t *testing.T, gd *gradcheck.GoldenData, name string) []float32 {
+	t.Helper()
+	arr, err := gd.GetArray(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return arr
+}
+
 func TestGolden_DenseBackward(t *testing.T) {
 	gd, err := gradcheck.LoadGolden("dense_backward_f32")
 	if err != nil {
@@ -33,15 +53,15 @@ func TestGolden_DenseBackward(t *testing.T) {
 	pool := workerpool.New(0)
 	defer pool.Close()
 
-	batch, _ := gd.GetDim("batchSize")
-	inF, _ := gd.GetDim("inFeatures")
-	outF, _ := gd.GetDim("outFeatures")
-	gradOutput, _ := gd.GetArray("gradOutput")
-	x, _ := gd.GetArray("x")
-	weight, _ := gd.GetArray("weight")
-	wantGI, _ := gd.GetArray("gradInput")
-	wantGW, _ := gd.GetArray("gradWeight")
-	wantGB, _ := gd.GetArray("gradBias")
+	batch := mustDim(t, gd, "batchSize")
+	inF := mustDim(t, gd, "inFeatures")
+	outF := mustDim(t, gd, "outFeatures")
+	gradOutput := mustArray(t, gd, "gradOutput")
+	x := mustArray(t, gd, "x")
+	weight := mustArray(t, gd, "weight")
+	wantGI := mustArray(t, gd, "gradInput")
+	wantGW := mustArray(t, gd, "gradWeight")
+	wantGB := mustArray(t, gd, "gradBias")
 
 	gotGI := make([]float32, batch*inF)
 	gotGW := make([]float32, outF*inF)
@@ -67,10 +87,10 @@ func TestGolden_GELUBackward(t *testing.T) {
 	pool := workerpool.New(0)
 	defer pool.Close()
 
-	n, _ := gd.GetDim("n")
-	gradOutput, _ := gd.GetArray("gradOutput")
-	savedInput, _ := gd.GetArray("savedInput")
-	wantGI, _ := gd.GetArray("gradInput")
+	n := mustDim(t, gd, "n")
+	gradOutput := mustArray(t, gd, "gradOutput")
+	savedInput := mustArray(t, gd, "savedInput")
+	wantGI := mustArray(t, gd, "gradInput")
 
 	gotGI := make([]float32, n)
 	GELUBackwardAuto(pool, gradOutput, savedInput, gotGI, 1, n)
@@ -90,11 +110,11 @@ func TestGolden_SoftmaxBackward(t *testing.T) {
 	pool := workerpool.New(0)
 	defer pool.Close()
 
-	rows, _ := gd.GetDim("rows")
-	cols, _ := gd.GetDim("cols")
-	gradOutput, _ := gd.GetArray("gradOutput")
-	savedProbs, _ := gd.GetArray("savedProbs")
-	wantGI, _ := gd.GetArray("gradInput")
+	rows := mustDim(t, gd, "rows")
+	cols := mustDim(t, gd, "cols")
+	gradOutput := mustArray(t, gd, "gradOutput")
+	savedProbs := mustArray(t, gd, "savedProbs")
+	wantGI := mustArray(t, gd, "gradInput")
 
 	gotGI := make([]float32, rows*cols)
 	SoftmaxBackwardAuto(pool, gradOutput, savedProbs, gotGI, rows, cols)
@@ -114,14 +134,14 @@ func TestGolden_LayerNormBackward(t *testing.T) {
 	pool := workerpool.New(0)
 	defer pool.Close()
 
-	normSize, _ := gd.GetDim("normSize")
-	gradOutput, _ := gd.GetArray("gradOutput")
-	savedXHat, _ := gd.GetArray("savedXHat")
-	savedInvStd, _ := gd.GetArray("savedInvStd")
-	gamma, _ := gd.GetArray("gamma")
-	wantGI, _ := gd.GetArray("gradInput")
-	wantGG, _ := gd.GetArray("gradGamma")
-	wantGBeta, _ := gd.GetArray("gradBeta")
+	normSize := mustDim(t, gd, "normSize")
+	gradOutput := mustArray(t, gd, "gradOutput")
+	savedXHat := mustArray(t, gd, "savedXHat")
+	savedInvStd := mustArray(t, gd, "savedInvStd")
+	gamma := mustArray(t, gd, "gamma")
+	wantGI := mustArray(t, gd, "gradInput")
+	wantGG := mustArray(t, gd, "gradGamma")
+	wantGBeta := mustArray(t, gd, "gradBeta")
 
 	n := len(gradOutput)
 	gotGI := make([]float32, n)
@@ -149,19 +169,19 @@ func TestGolden_SDPABackward(t *testing.T) {
 	pool := workerpool.New(0)
 	defer pool.Close()
 
-	seqLen, _ := gd.GetDim("seqLen")
-	kvLen, _ := gd.GetDim("kvLen")
-	headDim, _ := gd.GetDim("headDim")
+	seqLen := mustDim(t, gd, "seqLen")
+	kvLen := mustDim(t, gd, "kvLen")
+	headDim := mustDim(t, gd, "headDim")
 
-	Q, _ := gd.GetArray("Q")
-	K, _ := gd.GetArray("K")
-	V, _ := gd.GetArray("V")
-	probs, _ := gd.GetArray("probs")
-	scaleArr, _ := gd.GetArray("scale")
-	gradOutput, _ := gd.GetArray("gradOutput")
-	wantGQ, _ := gd.GetArray("gradQ")
-	wantGK, _ := gd.GetArray("gradK")
-	wantGV, _ := gd.GetArray("gradV")
+	Q := mustArray(t, gd, "Q")
+	K := mustArray(t, gd, "K")
+	V := mustArray(t, gd, "V")
+	probs := mustArray(t, gd, "probs")
+	scaleArr := mustArray(t, gd, "scale")
+	gradOutput := mustArray(t, gd, "gradOutput")
+	wantGQ := mustArray(t, gd, "gradQ")
+	wantGK := mustArray(t, gd, "gradK")
+	wantGV := mustArray(t, gd, "gradV")
 
 	saved := &SDPASaved[float32]{
 		Q: Q, K: K, V: V, Probs: probs,
@@ -195,21 +215,21 @@ func TestGolden_LoRABackward(t *testing.T) {
 	pool := workerpool.New(0)
 	defer pool.Close()
 
-	batch, _ := gd.GetDim("batchSize")
-	dIn, _ := gd.GetDim("dIn")
-	dOut, _ := gd.GetDim("dOut")
-	rank, _ := gd.GetDim("rank")
+	batch := mustDim(t, gd, "batchSize")
+	dIn := mustDim(t, gd, "dIn")
+	dOut := mustDim(t, gd, "dOut")
+	rank := mustDim(t, gd, "rank")
 
-	gradOutput, _ := gd.GetArray("gradOutput")
-	x, _ := gd.GetArray("x")
-	h, _ := gd.GetArray("h")
-	W, _ := gd.GetArray("W")
-	A, _ := gd.GetArray("A")
-	B, _ := gd.GetArray("B")
-	scaleArr, _ := gd.GetArray("scale")
-	wantGX, _ := gd.GetArray("gradX")
-	wantGA, _ := gd.GetArray("gradA")
-	wantGB, _ := gd.GetArray("gradB")
+	gradOutput := mustArray(t, gd, "gradOutput")
+	x := mustArray(t, gd, "x")
+	h := mustArray(t, gd, "h")
+	W := mustArray(t, gd, "W")
+	A := mustArray(t, gd, "A")
+	B := mustArray(t, gd, "B")
+	scaleArr := mustArray(t, gd, "scale")
+	wantGX := mustArray(t, gd, "gradX")
+	wantGA := mustArray(t, gd, "gradA")
+	wantGB := mustArray(t, gd, "gradB")
 
 	scale := scaleArr[0]
 
@@ -235,19 +255,19 @@ func TestGolden_AdamWStep(t *testing.T) {
 		t.Skip("golden data not found (run scripts/gen_golden_data.py)")
 	}
 
-	n, _ := gd.GetDim("n")
-	numSteps, _ := gd.GetDim("step")
+	n := mustDim(t, gd, "n")
+	numSteps := mustDim(t, gd, "step")
 
-	paramInit, _ := gd.GetArray("paramInit")
-	grad, _ := gd.GetArray("grad")
-	lrArr, _ := gd.GetArray("lr")
-	beta1Arr, _ := gd.GetArray("beta1")
-	beta2Arr, _ := gd.GetArray("beta2")
-	epsArr, _ := gd.GetArray("epsilon")
-	wdArr, _ := gd.GetArray("weightDecay")
-	wantParam, _ := gd.GetArray("paramFinal")
-	wantM, _ := gd.GetArray("mFinal")
-	wantV, _ := gd.GetArray("vFinal")
+	paramInit := mustArray(t, gd, "paramInit")
+	grad := mustArray(t, gd, "grad")
+	lrArr := mustArray(t, gd, "lr")
+	beta1Arr := mustArray(t, gd, "beta1")
+	beta2Arr := mustArray(t, gd, "beta2")
+	epsArr := mustArray(t, gd, "epsilon")
+	wdArr := mustArray(t, gd, "weightDecay")
+	wantParam := mustArray(t, gd, "paramFinal")
+	wantM := mustArray(t, gd, "mFinal")
+	wantV := mustArray(t, gd, "vFinal")
 
 	param := make([]float32, n)
 	copy(param, paramInit)

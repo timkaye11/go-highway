@@ -18,8 +18,5 @@ import stdmath "math"
 
 // Scalar math helpers to avoid import aliasing conflicts across files.
 
-func exp64(x float64) float64 { return stdmath.Exp(x) }
-func log64(x float64) float64 { return stdmath.Log(x) }
 func sqrt64(x float64) float64 { return stdmath.Sqrt(x) }
-func abs64(x float64) float64 { return stdmath.Abs(x) }
 func pow64(x, y float64) float64 { return stdmath.Pow(x, y) }

@@ -33,12 +33,12 @@ var (
 	LayerNormTolerance = OpTolerance{Float32RelTol: 5e-3, Float64RelTol: 1e-4}
 	SDPATolerance      = OpTolerance{Float32RelTol: 1e-2, Float64RelTol: 1e-3}
 	LoRATolerance      = OpTolerance{Float32RelTol: 1e-3, Float64RelTol: 1e-5}
-	CrossEntropyTol    = OpTolerance{Float32RelTol: 5e-3, Float64RelTol: 1e-4}
-	FocalLossTol       = OpTolerance{Float32RelTol: 5e-3, Float64RelTol: 1e-4}
+	CrossEntropyTolerance = OpTolerance{Float32RelTol: 5e-3, Float64RelTol: 1e-4}
+	FocalLossTolerance   = OpTolerance{Float32RelTol: 5e-3, Float64RelTol: 1e-4}
 	AdamWTolerance     = OpTolerance{Float32RelTol: 1e-3, Float64RelTol: 1e-5}
 )
 
-// ConfigFor returns a GradCheckConfig for the given operation tolerance and precision.
+// ConfigFor64 returns a GradCheckConfig for float64 precision.
 func (t OpTolerance) ConfigFor64() GradCheckConfig {
 	return GradCheckConfig{
 		Epsilon:   1e-5,

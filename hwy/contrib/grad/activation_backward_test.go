@@ -44,12 +44,10 @@ func allClose32(t *testing.T, name string, got, want []float32, relTol float64) 
 	}
 }
 
-// geluScalar computes GELU(x) for forward pass.
 func geluScalar(x float64) float64 {
 	return 0.5 * x * (1.0 + stdmath.Erf(x/stdmath.Sqrt2))
 }
 
-// geluDerivScalar computes d/dx GELU(x).
 func geluDerivScalar(x float64) float64 {
 	cdf := 0.5 * (1.0 + stdmath.Erf(x/stdmath.Sqrt2))
 	pdf := (1.0 / stdmath.Sqrt(2*stdmath.Pi)) * stdmath.Exp(-0.5*x*x)
@@ -74,7 +72,6 @@ func TestGELUBackward_ScalarMatch(t *testing.T) {
 		gradAuto := make([]float32, n)
 		gradScalar := make([]float32, n)
 
-		// Scalar reference: gradInput[i] += gradOutput[i] * dGELU/dx(savedInput[i])
 		for i := range n {
 			gradScalar[i] = gradOutput[i] * float32(geluDerivScalar(float64(savedInput[i])))
 		}
@@ -88,69 +85,91 @@ func TestReLUBackward_ScalarMatch(t *testing.T) {
 	pool := workerpool.New(0)
 	defer pool.Close()
 
-	n := 64
-	gradOutput := testInputs(n)
-	savedInput := testInputs(n)
-
-	gradAuto := make([]float32, n)
-	gradScalar := make([]float32, n)
-
-	for i := range n {
-		if savedInput[i] > 0 {
-			gradScalar[i] = gradOutput[i]
-		}
+	sizes := []struct {
+		rows, cols int
+	}{
+		{4, 16}, {2, 32}, {3, 7}, {8, 17}, {1, 8},
 	}
 
-	ReLUBackwardAuto(pool, gradOutput, savedInput, gradAuto, 4, 16)
-	allClose32(t, "ReLUBackward", gradAuto, gradScalar, 1e-6)
+	for _, s := range sizes {
+		n := s.rows * s.cols
+		gradOutput := testInputs(n)
+		savedInput := testInputs(n)
+
+		gradAuto := make([]float32, n)
+		gradScalar := make([]float32, n)
+
+		for i := range n {
+			if savedInput[i] > 0 {
+				gradScalar[i] = gradOutput[i]
+			}
+		}
+
+		ReLUBackwardAuto(pool, gradOutput, savedInput, gradAuto, s.rows, s.cols)
+		allClose32(t, "ReLUBackward", gradAuto, gradScalar, 1e-6)
+	}
 }
 
 func TestSiLUBackward_ScalarMatch(t *testing.T) {
 	pool := workerpool.New(0)
 	defer pool.Close()
 
-	n := 64
-	gradOutput := testInputs(n)
-	savedInput := testInputs(n)
-
-	gradAuto := make([]float32, n)
-	gradScalar := make([]float32, n)
-
-	for i := range n {
-		x := float64(savedInput[i])
-		sig := 1.0 / (1.0 + stdmath.Exp(-x))
-		// dSiLU/dx = σ(x) * (1 + x*(1-σ(x)))
-		deriv := sig * (1.0 + x*(1.0-sig))
-		gradScalar[i] = gradOutput[i] * float32(deriv)
+	sizes := []struct {
+		rows, cols int
+	}{
+		{4, 16}, {2, 32}, {3, 7}, {8, 17}, {1, 8},
 	}
 
-	SiLUBackwardAuto(pool, gradOutput, savedInput, gradAuto, 4, 16)
-	allClose32(t, "SiLUBackward", gradAuto, gradScalar, 1e-4)
+	for _, s := range sizes {
+		n := s.rows * s.cols
+		gradOutput := testInputs(n)
+		savedInput := testInputs(n)
+
+		gradAuto := make([]float32, n)
+		gradScalar := make([]float32, n)
+
+		for i := range n {
+			x := float64(savedInput[i])
+			sig := 1.0 / (1.0 + stdmath.Exp(-x))
+			deriv := sig * (1.0 + x*(1.0-sig))
+			gradScalar[i] = gradOutput[i] * float32(deriv)
+		}
+
+		SiLUBackwardAuto(pool, gradOutput, savedInput, gradAuto, s.rows, s.cols)
+		allClose32(t, "SiLUBackward", gradAuto, gradScalar, 1e-4)
+	}
 }
 
 func TestTanhBackward_ScalarMatch(t *testing.T) {
 	pool := workerpool.New(0)
 	defer pool.Close()
 
-	n := 64
-	gradOutput := testInputs(n)
-	// savedOutput is tanh(input), not the input itself
-	savedOutput := make([]float32, n)
-	for i := range n {
-		savedOutput[i] = float32(stdmath.Tanh(float64(testInputs(n)[i])))
+	sizes := []struct {
+		rows, cols int
+	}{
+		{4, 16}, {2, 32}, {3, 7}, {8, 17}, {1, 8},
 	}
 
-	gradAuto := make([]float32, n)
-	gradScalar := make([]float32, n)
+	for _, s := range sizes {
+		n := s.rows * s.cols
+		gradOutput := testInputs(n)
+		inputs := testInputs(n)
+		savedOutput := make([]float32, n)
+		for i := range n {
+			savedOutput[i] = float32(stdmath.Tanh(float64(inputs[i])))
+		}
 
-	for i := range n {
-		t2 := float64(savedOutput[i])
-		// dTanh/dx = 1 - tanh²(x)
-		gradScalar[i] = gradOutput[i] * float32(1.0-t2*t2)
+		gradAuto := make([]float32, n)
+		gradScalar := make([]float32, n)
+
+		for i := range n {
+			t2 := float64(savedOutput[i])
+			gradScalar[i] = gradOutput[i] * float32(1.0-t2*t2)
+		}
+
+		TanhBackwardAuto(pool, gradOutput, savedOutput, gradAuto, s.rows, s.cols)
+		allClose32(t, "TanhBackward", gradAuto, gradScalar, 1e-5)
 	}
-
-	TanhBackwardAuto(pool, gradOutput, savedOutput, gradAuto, 4, 16)
-	allClose32(t, "TanhBackward", gradAuto, gradScalar, 1e-5)
 }
 
 func TestGELUBackward_NumericalGradient(t *testing.T) {
@@ -171,6 +190,23 @@ func TestGELUBackward_NumericalGradient(t *testing.T) {
 			t.Errorf("x=%v: numerical=%v, analytical=%v, diff=%v", xi, numerical, analytical, diff)
 		}
 	}
+}
+
+func TestResidualAddBackward(t *testing.T) {
+	n := 32
+	gradOutput := testInputs(n)
+	gradInput := make([]float32, n)
+	for i := range n {
+		gradInput[i] = float32(i) * 0.01
+	}
+
+	want := make([]float32, n)
+	for i := range n {
+		want[i] = gradInput[i] + gradOutput[i]
+	}
+
+	ResidualAddBackward(gradOutput, gradInput)
+	allClose32(t, "ResidualAddBackward", gradInput, want, 1e-6)
 }
 
 func BenchmarkGELUBackward(b *testing.B) {

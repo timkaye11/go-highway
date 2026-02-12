@@ -15,8 +15,9 @@
 package grad
 
 import (
+	stdmath "math"
+
 	"github.com/ajroetker/go-highway/hwy"
-	"github.com/ajroetker/go-highway/hwy/contrib/activation"
 	"github.com/ajroetker/go-highway/hwy/contrib/vec"
 	"github.com/ajroetker/go-highway/hwy/contrib/workerpool"
 )
@@ -95,47 +96,41 @@ func SoftmaxBackwardScalar[T hwy.Floats](gradOutput, savedProbs, gradInput []T) 
 // where N = batchSize and C = numClasses. Targets should be one-hot or
 // soft label distributions that sum to 1 per sample.
 func CrossEntropyLoss[T hwy.Floats](logits, targets []T, batchSize, numClasses int) T {
-	_ = activation.MinParallelActivationOps // keep import used
 	var totalLoss float64
 	probs := make([]T, numClasses)
 
 	for i := range batchSize {
 		off := i * numClasses
+		softmaxInPlace(logits[off:off+numClasses], probs)
 
-		// Compute softmax for this sample
-		row := logits[off : off+numClasses]
-
-		// Find max for numerical stability
-		maxVal := row[0]
-		for j := 1; j < numClasses; j++ {
-			if row[j] > maxVal {
-				maxVal = row[j]
-			}
-		}
-
-		// Compute exp and sum
-		var expSum float64
-		for j := range numClasses {
-			probs[j] = T(float64(row[j]) - float64(maxVal))
-		}
-		for j := range numClasses {
-			probs[j] = T(exp64(float64(probs[j])))
-			expSum += float64(probs[j])
-		}
-		invSum := 1.0 / expSum
-		for j := range numClasses {
-			probs[j] = T(float64(probs[j]) * invSum)
-		}
-
-		// Cross-entropy: -Σ target * log(prob)
 		for j := range numClasses {
 			if targets[off+j] > 0 {
-				totalLoss -= float64(targets[off+j]) * log64(float64(probs[j]))
+				totalLoss -= float64(targets[off+j]) * stdmath.Log(float64(probs[j]))
 			}
 		}
 	}
 
 	return T(totalLoss / float64(batchSize))
+}
+
+// softmaxInPlace computes softmax of src into dst (same length).
+func softmaxInPlace[T hwy.Floats](src, dst []T) {
+	n := len(src)
+	maxVal := src[0]
+	for j := 1; j < n; j++ {
+		if src[j] > maxVal {
+			maxVal = src[j]
+		}
+	}
+	var expSum float64
+	for j := range n {
+		dst[j] = T(stdmath.Exp(float64(src[j]) - float64(maxVal)))
+		expSum += float64(dst[j])
+	}
+	invSum := 1.0 / expSum
+	for j := range n {
+		dst[j] = T(float64(dst[j]) * invSum)
+	}
 }
 
 // CrossEntropyBackward computes the backward pass for cross-entropy loss
@@ -152,27 +147,9 @@ func CrossEntropyBackward[T hwy.Floats](
 	invN := T(1.0) / T(batchSize)
 	probs := make([]T, batchSize*numClasses)
 
-	// Compute softmax per row
 	for i := range batchSize {
 		off := i * numClasses
-		row := logits[off : off+numClasses]
-		pRow := probs[off : off+numClasses]
-
-		maxVal := row[0]
-		for j := 1; j < numClasses; j++ {
-			if row[j] > maxVal {
-				maxVal = row[j]
-			}
-		}
-		var expSum float64
-		for j := range numClasses {
-			pRow[j] = T(exp64(float64(row[j]) - float64(maxVal)))
-			expSum += float64(pRow[j])
-		}
-		inv := 1.0 / expSum
-		for j := range numClasses {
-			pRow[j] = T(float64(pRow[j]) * inv)
-		}
+		softmaxInPlace(logits[off:off+numClasses], probs[off:off+numClasses])
 	}
 
 	// gradLogits += (softmax - target) / batchSize

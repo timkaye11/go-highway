@@ -59,9 +59,6 @@ func SDPABackwardAuto[T hwy.Floats](
 	}
 
 	// dV += P^T @ dO
-	// P is [seqLen, kvLen], dO is [seqLen, headDim]
-	// P^T is [kvLen, seqLen], P^T @ dO => [kvLen, headDim]
-	// => m=kvLen, n=headDim, k=seqLen
 	if gradV != nil {
 		pT := make([]T, kvLen*seqLen)
 		matmul.TransposeAuto(pool, saved.Probs, seqLen, kvLen, pT)
@@ -71,10 +68,6 @@ func SDPABackwardAuto[T hwy.Floats](
 	}
 
 	// dP = dO @ V^T
-	// dO is [seqLen, headDim], V is [kvLen, headDim]
-	// dO @ V^T => [seqLen, kvLen]
-	// MatMulKLastAuto: A[M,K] @ B[N,K]^T => C[M,N]
-	// A=dO[seqLen, headDim], B=V[kvLen, headDim] => C[seqLen, kvLen]
 	dP := make([]T, seqLen*kvLen)
 	matmul.MatMulKLastAuto(pool, gradOutput, saved.V, dP, seqLen, kvLen, headDim)
 
@@ -86,8 +79,6 @@ func SDPABackwardAuto[T hwy.Floats](
 	}
 
 	// dQ += scale * dS @ K
-	// dS is [seqLen, kvLen], K is [kvLen, headDim]
-	// => m=seqLen, n=headDim, k=kvLen
 	if gradQ != nil {
 		temp := make([]T, seqLen*headDim)
 		matmul.MatMulAuto(pool, dS, saved.K, temp, seqLen, headDim, kvLen)
@@ -95,8 +86,6 @@ func SDPABackwardAuto[T hwy.Floats](
 	}
 
 	// dK += scale * dS^T @ Q
-	// dS^T is [kvLen, seqLen], Q is [seqLen, headDim]
-	// => m=kvLen, n=headDim, k=seqLen
 	if gradK != nil {
 		dST := make([]T, kvLen*seqLen)
 		matmul.TransposeAuto(pool, dS, seqLen, kvLen, dST)

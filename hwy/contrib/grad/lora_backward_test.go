@@ -72,9 +72,9 @@ func TestLoRABackward_AutoVsScalar(t *testing.T) {
 			sGB := make([]float32, tt.dOut*tt.rank)
 			LoRABackwardScalar(gradOutput, x, h, W, A, B, scale, sGX, sGA, sGB, tt.batch, tt.dIn, tt.dOut, tt.rank)
 
-			allClose32(t, "gradX", aGX, sGX, 1e-2)
-			allClose32(t, "gradA", aGA, sGA, 1e-2)
-			allClose32(t, "gradB", aGB, sGB, 1e-2)
+			allClose32(t, "gradX", aGX, sGX, 1e-3)
+			allClose32(t, "gradA", aGA, sGA, 1e-3)
+			allClose32(t, "gradB", aGB, sGB, 1e-3)
 		})
 	}
 }

@@ -14,7 +14,11 @@
 
 package grad
 
-import "github.com/ajroetker/go-highway/hwy"
+import (
+	stdmath "math"
+
+	"github.com/ajroetker/go-highway/hwy"
+)
 
 // FocalLoss computes the focal loss between predicted probabilities and targets.
 //
@@ -33,35 +37,35 @@ import "github.com/ajroetker/go-highway/hwy"
 // Returns the mean focal loss across the batch.
 func FocalLoss[T hwy.Floats](probs, targets []T, alpha, gamma T, batchSize, numClasses int) T {
 	var totalLoss float64
-	eps := 1e-7
 
 	for i := range batchSize {
 		for j := range numClasses {
 			idx := i*numClasses + j
-			p := float64(probs[idx])
+			p := clampProb(float64(probs[idx]))
 			t := float64(targets[idx])
 
-			// Clamp probability for numerical stability
-			if p < eps {
-				p = eps
-			}
-			if p > 1.0-eps {
-				p = 1.0 - eps
-			}
-
-			// p_t = p if target=1, (1-p) if target=0
-			// For soft labels, interpolate: loss = -t * alpha * (1-p)^gamma * log(p)
-			//                                    - (1-t) * (1-alpha) * p^gamma * log(1-p)
 			if t > 0 {
-				totalLoss -= t * float64(alpha) * pow64(1.0-p, float64(gamma)) * log64(p)
+				totalLoss -= t * float64(alpha) * pow64(1.0-p, float64(gamma)) * stdmath.Log(p)
 			}
 			if t < 1 {
-				totalLoss -= (1.0 - t) * (1.0 - float64(alpha)) * pow64(p, float64(gamma)) * log64(1.0-p)
+				totalLoss -= (1.0 - t) * (1.0 - float64(alpha)) * pow64(p, float64(gamma)) * stdmath.Log(1.0-p)
 			}
 		}
 	}
 
 	return T(totalLoss / float64(batchSize))
+}
+
+// clampProb clamps a probability to [eps, 1-eps] for numerical stability.
+func clampProb(p float64) float64 {
+	const eps = 1e-7
+	if p < eps {
+		return eps
+	}
+	if p > 1.0-eps {
+		return 1.0 - eps
+	}
+	return p
 }
 
 // FocalLossBackward computes the backward pass for focal loss.
@@ -88,29 +92,21 @@ func FocalLossBackward[T hwy.Floats](
 	batchSize, numClasses int,
 ) {
 	invN := 1.0 / float64(batchSize)
-	eps := 1e-7
 	a := float64(alpha)
 	g := float64(gamma)
 
 	for i := range batchSize {
 		for j := range numClasses {
 			idx := i*numClasses + j
-			p := float64(probs[idx])
+			p := clampProb(float64(probs[idx]))
 			t := float64(targets[idx])
-
-			if p < eps {
-				p = eps
-			}
-			if p > 1.0-eps {
-				p = 1.0 - eps
-			}
 
 			var grad float64
 
 			// Positive class: d/dp [-alpha * t * (1-p)^gamma * log(p)]
 			if t > 0 {
 				omp := 1.0 - p // (1 - p)
-				logp := log64(p)
+				logp := stdmath.Log(p)
 				// -alpha * t * [-gamma*(1-p)^(gamma-1)*log(p) + (1-p)^gamma/p]
 				term1 := -g * pow64(omp, g-1) * logp
 				term2 := pow64(omp, g) / p
@@ -120,7 +116,7 @@ func FocalLossBackward[T hwy.Floats](
 			// Negative class: d/dp [-(1-alpha) * (1-t) * p^gamma * log(1-p)]
 			if t < 1 {
 				omp := 1.0 - p
-				logOmp := log64(omp)
+				logOmp := stdmath.Log(omp)
 				// -(1-alpha) * (1-t) * [gamma*p^(gamma-1)*log(1-p) + p^gamma*(-1/(1-p))]
 				term1 := g * pow64(p, g-1) * logOmp
 				term2 := -pow64(p, g) / omp
