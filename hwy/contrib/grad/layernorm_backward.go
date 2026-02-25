@@ -42,7 +42,7 @@ func LayerNormBackwardAuto[T hwy.Floats](
 	numGroups := size / normSize
 
 	if pool == nil || numGroups*normSize < activation.MinParallelActivationOps {
-		LayerNormBackward(gradOutput, savedXHat, savedInvStd, gamma, normSize,
+		LayerNormBackwardScalar(gradOutput, savedXHat, savedInvStd, gamma, normSize,
 			gradInput, gradGamma, gradBeta)
 		return
 	}
@@ -55,7 +55,7 @@ func LayerNormBackwardAuto[T hwy.Floats](
 			xhSlice := savedXHat[start*normSize : end*normSize]
 			isSlice := savedInvStd[start:end]
 			giSlice := gradInput[start*normSize : end*normSize]
-			LayerNormBackward(goSlice, xhSlice, isSlice, gamma, normSize,
+			LayerNormBackwardScalar(goSlice, xhSlice, isSlice, gamma, normSize,
 				giSlice, nil, nil)
 		})
 		return
@@ -77,7 +77,7 @@ func LayerNormBackwardAuto[T hwy.Floats](
 			localGB = make([]T, normSize)
 		}
 
-		LayerNormBackward(goSlice, xhSlice, isSlice, gamma, normSize,
+		LayerNormBackwardScalar(goSlice, xhSlice, isSlice, gamma, normSize,
 			giSlice, localGG, localGB)
 
 		// Merge local buffers under lock

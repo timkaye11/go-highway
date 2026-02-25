@@ -222,11 +222,28 @@ func BenchmarkLayerNormBackward(b *testing.B) {
 		gamma[i] = 1.0
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		clear(gradInput)
-		clear(gradGamma)
-		clear(gradBeta)
-		LayerNormBackwardAuto(pool, gradOutput, savedXHat, savedInvStd, gamma, normSize, gradInput, gradGamma, gradBeta)
-	}
+	b.Run("Auto", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			clear(gradInput)
+			clear(gradGamma)
+			clear(gradBeta)
+			LayerNormBackwardAuto(pool, gradOutput, savedXHat, savedInvStd, gamma, normSize, gradInput, gradGamma, gradBeta)
+		}
+	})
+	b.Run("SIMD", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			clear(gradInput)
+			clear(gradGamma)
+			clear(gradBeta)
+			LayerNormBackward(gradOutput, savedXHat, savedInvStd, gamma, normSize, gradInput, gradGamma, gradBeta)
+		}
+	})
+	b.Run("Scalar", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			clear(gradInput)
+			clear(gradGamma)
+			clear(gradBeta)
+			LayerNormBackwardScalar(gradOutput, savedXHat, savedInvStd, gamma, normSize, gradInput, gradGamma, gradBeta)
+		}
+	})
 }

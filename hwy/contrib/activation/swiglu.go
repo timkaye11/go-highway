@@ -27,7 +27,7 @@ func ParallelSwiGLU[T hwy.Floats](pool *workerpool.Pool, gate, up, output []T, r
 	if pool == nil || rows*cols < MinParallelActivationOps {
 		for r := range rows {
 			off := r * cols
-			SwiGLU(gate[off:off+cols], up[off:off+cols], output[off:off+cols])
+			SwiGLUScalar(gate[off:off+cols], up[off:off+cols], output[off:off+cols])
 		}
 		return
 	}
@@ -35,7 +35,7 @@ func ParallelSwiGLU[T hwy.Floats](pool *workerpool.Pool, gate, up, output []T, r
 	pool.ParallelForAtomicBatched(rows, ActivationRowBatch, func(start, end int) {
 		for r := start; r < end; r++ {
 			off := r * cols
-			SwiGLU(gate[off:off+cols], up[off:off+cols], output[off:off+cols])
+			SwiGLUScalar(gate[off:off+cols], up[off:off+cols], output[off:off+cols])
 		}
 	})
 }
@@ -48,7 +48,7 @@ func ParallelGeGLU[T hwy.Floats](pool *workerpool.Pool, gate, up, output []T, ro
 	if pool == nil || rows*cols < MinParallelActivationOps {
 		for r := range rows {
 			off := r * cols
-			GeGLU(gate[off:off+cols], up[off:off+cols], output[off:off+cols])
+			GeGLUScalar(gate[off:off+cols], up[off:off+cols], output[off:off+cols])
 		}
 		return
 	}
@@ -56,7 +56,7 @@ func ParallelGeGLU[T hwy.Floats](pool *workerpool.Pool, gate, up, output []T, ro
 	pool.ParallelForAtomicBatched(rows, ActivationRowBatch, func(start, end int) {
 		for r := start; r < end; r++ {
 			off := r * cols
-			GeGLU(gate[off:off+cols], up[off:off+cols], output[off:off+cols])
+			GeGLUScalar(gate[off:off+cols], up[off:off+cols], output[off:off+cols])
 		}
 	})
 }

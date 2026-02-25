@@ -19,6 +19,7 @@ import (
 	stdmath "math"
 	"testing"
 
+	"github.com/ajroetker/go-highway/hwy/contrib/activation"
 	"github.com/ajroetker/go-highway/hwy/contrib/workerpool"
 )
 
@@ -150,11 +151,37 @@ func BenchmarkFusedLoRAMLP(b *testing.B) {
 			Scale: 0.5, Rank: c.rank,
 		}
 
-		b.Run(fmt.Sprintf("b%d_%dx%d_r%d", c.batch, c.inF, c.interSize, c.rank), func(b *testing.B) {
+		label := fmt.Sprintf("b%d_%dx%d_r%d", c.batch, c.inF, c.interSize, c.rank)
+
+		b.Run("Fused/"+label, func(b *testing.B) {
+			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
 				FusedLoRAMLPForwardAuto(pool, x, wGate, wUp, wDown,
 					loraGate, loraUp, loraDown, output, nil,
 					c.batch, c.inF, c.interSize)
+			}
+		})
+
+		b.Run("Separate/"+label, func(b *testing.B) {
+			b.ReportAllocs()
+			gate := make([]float32, c.batch*c.interSize)
+			up := make([]float32, c.batch*c.interSize)
+			hidden := make([]float32, c.batch*c.interSize)
+			for i := 0; i < b.N; i++ {
+				// gate = FusedLoRADense(x, wGate, loraGate)
+				FusedLoRADenseAuto(pool, x, wGate, nil,
+					loraGate.A, loraGate.B, loraGate.Scale, gate, nil,
+					c.batch, c.inF, c.interSize, c.rank)
+				// up = FusedLoRADense(x, wUp, loraUp)
+				FusedLoRADenseAuto(pool, x, wUp, nil,
+					loraUp.A, loraUp.B, loraUp.Scale, up, nil,
+					c.batch, c.inF, c.interSize, c.rank)
+				// hidden = SwiGLU(gate, up)
+				activation.ParallelSwiGLU(pool, gate, up, hidden, c.batch, c.interSize)
+				// output = FusedLoRADense(hidden, wDown, loraDown)
+				FusedLoRADenseAuto(pool, hidden, wDown, nil,
+					loraDown.A, loraDown.B, loraDown.Scale, output, nil,
+					c.batch, c.interSize, c.inF, c.rank)
 			}
 		})
 	}

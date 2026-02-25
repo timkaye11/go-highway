@@ -68,6 +68,15 @@ func BaseGELU[T hwy.Floats](input, output []T) {
 	}
 }
 
+// GELUScalar is a scalar reference implementation of GELU.
+func GELUScalar[T hwy.Floats](input, output []T) {
+	size := min(len(input), len(output))
+	for i := range size {
+		x := float64(input[i])
+		output[i] = T(x * 0.5 * (1.0 + stdmath.Erf(x*0.7071067811865476)))
+	}
+}
+
 // BaseGELUApprox computes a fast approximation of GELU.
 //
 // Uses the sigmoid approximation: GELU(x) = x * sigmoid(1.702 * x)
@@ -107,6 +116,16 @@ func BaseGELUApprox[T hwy.Floats](input, output []T) {
 	}
 }
 
+// GELUApproxScalar is a scalar reference implementation of the approximate GELU.
+func GELUApproxScalar[T hwy.Floats](input, output []T) {
+	size := min(len(input), len(output))
+	for i := range size {
+		x := float64(input[i])
+		sigmoid := 1.0 / (1.0 + stdmath.Exp(-1.702*x))
+		output[i] = T(x * sigmoid)
+	}
+}
+
 // BaseReLU computes the Rectified Linear Unit activation: max(0, x).
 //
 // ReLU is the most common activation function, providing fast computation
@@ -133,6 +152,18 @@ func BaseReLU[T hwy.Floats](input, output []T) {
 
 	// Handle tail elements
 	for i := ii; i < size; i++ {
+		if input[i] > 0 {
+			output[i] = input[i]
+		} else {
+			output[i] = 0
+		}
+	}
+}
+
+// ReLUScalar is a scalar reference implementation of ReLU.
+func ReLUScalar[T hwy.Floats](input, output []T) {
+	size := min(len(input), len(output))
+	for i := range size {
 		if input[i] > 0 {
 			output[i] = input[i]
 		} else {
@@ -177,6 +208,16 @@ func BaseSiLU[T hwy.Floats](input, output []T) {
 	}
 }
 
+// SiLUScalar is a scalar reference implementation of SiLU (Swish).
+func SiLUScalar[T hwy.Floats](input, output []T) {
+	size := min(len(input), len(output))
+	for i := range size {
+		x := float64(input[i])
+		sigmoid := 1.0 / (1.0 + stdmath.Exp(-x))
+		output[i] = T(x * sigmoid)
+	}
+}
+
 // BaseLeakyReLU computes the Leaky ReLU activation with a configurable slope.
 //
 // LeakyReLU(x) = x if x > 0, else alpha * x
@@ -207,6 +248,18 @@ func BaseLeakyReLU[T hwy.Floats](input, output []T, alpha T) {
 
 	// Handle tail elements
 	for i := ii; i < size; i++ {
+		if input[i] > 0 {
+			output[i] = input[i]
+		} else {
+			output[i] = alpha * input[i]
+		}
+	}
+}
+
+// LeakyReLUScalar is a scalar reference implementation of LeakyReLU.
+func LeakyReLUScalar[T hwy.Floats](input, output []T, alpha T) {
+	size := min(len(input), len(output))
+	for i := range size {
 		if input[i] > 0 {
 			output[i] = input[i]
 		} else {
@@ -247,6 +300,14 @@ func BaseTanh[T hwy.Floats](input, output []T) {
 	}
 }
 
+// TanhScalar is a scalar reference implementation of Tanh.
+func TanhScalar[T hwy.Floats](input, output []T) {
+	size := min(len(input), len(output))
+	for i := range size {
+		output[i] = T(stdmath.Tanh(float64(input[i])))
+	}
+}
+
 // BaseELU computes the Exponential Linear Unit activation.
 //
 // ELU(x) = x if x > 0, else alpha * (exp(x) - 1)
@@ -282,6 +343,19 @@ func BaseELU[T hwy.Floats](input, output []T, alpha T) {
 
 	// Handle tail elements with scalar math
 	for i := ii; i < size; i++ {
+		if input[i] > 0 {
+			output[i] = input[i]
+		} else {
+			x := float64(input[i])
+			output[i] = T(float64(alpha) * (stdmath.Exp(x) - 1.0))
+		}
+	}
+}
+
+// ELUScalar is a scalar reference implementation of ELU.
+func ELUScalar[T hwy.Floats](input, output []T, alpha T) {
+	size := min(len(input), len(output))
+	for i := range size {
 		if input[i] > 0 {
 			output[i] = input[i]
 		} else {

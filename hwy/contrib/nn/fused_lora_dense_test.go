@@ -19,6 +19,8 @@ import (
 	stdmath "math"
 	"testing"
 
+	"github.com/ajroetker/go-highway/hwy/contrib/matmul"
+	"github.com/ajroetker/go-highway/hwy/contrib/vec"
 	"github.com/ajroetker/go-highway/hwy/contrib/workerpool"
 )
 
@@ -163,26 +165,46 @@ func BenchmarkFusedLoRADense(b *testing.B) {
 	pool := workerpool.New(0)
 	defer pool.Close()
 
-	batch, inF, outF, rank := 8, 768, 768, 16
-	x := make([]float32, batch*inF)
-	W := make([]float32, outF*inF)
-	bias := make([]float32, outF)
-	A := make([]float32, rank*inF)
-	B := make([]float32, outF*rank)
-	output := make([]float32, batch*outF)
-	h := make([]float32, batch*rank)
+	configs := []struct {
+		batch, inF, outF, rank int
+	}{
+		{8, 768, 768, 16},
+		{8, 768, 3072, 16},
+	}
 
-	b.Run("Fused", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			FusedLoRADenseAuto(pool, x, W, bias, A, B, 0.5, output, h, batch, inF, outF, rank)
-		}
-	})
+	for _, c := range configs {
+		x := make([]float32, c.batch*c.inF)
+		W := make([]float32, c.outF*c.inF)
+		bias := make([]float32, c.outF)
+		A := make([]float32, c.rank*c.inF)
+		B := make([]float32, c.outF*c.rank)
+		output := make([]float32, c.batch*c.outF)
+		h := make([]float32, c.batch*c.rank)
 
-	b.Run("Separate", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			DenseAuto(pool, x, W, bias, output, batch, inF, outF)
-		}
-	})
+		label := fmt.Sprintf("b%d_%dx%d_r%d", c.batch, c.inF, c.outF, c.rank)
+
+		b.Run("Fused/"+label, func(b *testing.B) {
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				FusedLoRADenseAuto(pool, x, W, bias, A, B, 0.5, output, h, c.batch, c.inF, c.outF, c.rank)
+			}
+		})
+
+		b.Run("Separate/"+label, func(b *testing.B) {
+			b.ReportAllocs()
+			temp := make([]float32, c.batch*c.outF)
+			for i := 0; i < b.N; i++ {
+				// Base: output = x @ W^T + bias
+				DenseAuto(pool, x, W, bias, output, c.batch, c.inF, c.outF)
+				// LoRA: h = x @ A^T
+				matmul.MatMulKLastAuto(pool, x, A, h, c.batch, c.rank, c.inF)
+				// LoRA: temp = h @ B^T
+				matmul.MatMulKLastAuto(pool, h, B, temp, c.batch, c.outF, c.rank)
+				// output += scale * temp
+				vec.MulConstAddTo(output, float32(0.5), temp)
+			}
+		})
+	}
 }
 
 func testInputs(n int) []float32 {

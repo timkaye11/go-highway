@@ -219,6 +219,7 @@ func BenchmarkSwiGLUBackward(b *testing.B) {
 		savedUp[i] = float32(i) * 0.001
 	}
 
+	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		clear(gradGate)

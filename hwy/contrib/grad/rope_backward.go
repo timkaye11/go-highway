@@ -31,49 +31,7 @@ import (
 //   - seqLen:  sequence length
 //   - headDim: dimension per head (must be even)
 func RoPEBackward[T hwy.Floats](data, cos, sin []T, seqLen, headDim int) {
-	if seqLen == 0 || headDim == 0 {
-		return
-	}
-
-	halfDim := headDim / 2
-	lanes := hwy.MaxLanes[T]()
-
-	for pos := range seqLen {
-		dataOff := pos * headDim
-		csOff := pos * halfDim
-
-		first := data[dataOff : dataOff+halfDim]
-		second := data[dataOff+halfDim : dataOff+headDim]
-		c := cos[csOff : csOff+halfDim]
-		s := sin[csOff : csOff+halfDim]
-
-		// Backward: R^T means negate sin
-		// new_first  = first * cos + second * sin   (note: + because sin is negated)
-		// new_second = -first * sin + second * cos
-		ii := 0
-		for ; ii+lanes <= halfDim; ii += lanes {
-			f := hwy.Load(first[ii:])
-			se := hwy.Load(second[ii:])
-			cv := hwy.Load(c[ii:])
-			sv := hwy.Load(s[ii:])
-
-			// new_first = first * cos + second * sin
-			newFirst := hwy.MulAdd(se, sv, hwy.Mul(f, cv))
-			// new_second = -first * sin + second * cos
-			newSecond := hwy.Sub(hwy.Mul(se, cv), hwy.Mul(f, sv))
-
-			hwy.Store(newFirst, first[ii:])
-			hwy.Store(newSecond, second[ii:])
-		}
-
-		// Scalar tail
-		for d := ii; d < halfDim; d++ {
-			f := first[d]
-			se := second[d]
-			first[d] = f*c[d] + se*s[d]
-			second[d] = -f*s[d] + se*c[d]
-		}
-	}
+	RoPEBackwardScalar(data, cos, sin, seqLen, headDim)
 }
 
 // RoPEBackwardAuto applies the RoPE backward pass to gradQ and gradK in
@@ -100,7 +58,7 @@ func RoPEBackwardAuto[T hwy.Floats](
 			off := kvIdx * headStride
 			data = gradK[off : off+headStride]
 		}
-		RoPEBackward(data, cos, sin, seqLen, headDim)
+		RoPEBackwardScalar(data, cos, sin, seqLen, headDim)
 	}
 
 	if pool != nil && totalHeads > 1 {

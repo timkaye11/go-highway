@@ -204,13 +204,15 @@ func BenchmarkRoPEBackward(b *testing.B) {
 			data[i] = float32(i) * 0.01
 		}
 
-		b.Run(fmt.Sprintf("SIMD/seq=%d_dim=%d", c.seqLen, c.headDim), func(b *testing.B) {
+		b.Run(fmt.Sprintf("Func/seq=%d_dim=%d", c.seqLen, c.headDim), func(b *testing.B) {
+			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
 				RoPEBackward(data, cos, sin, c.seqLen, c.headDim)
 			}
 		})
 
 		b.Run(fmt.Sprintf("Scalar/seq=%d_dim=%d", c.seqLen, c.headDim), func(b *testing.B) {
+			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
 				RoPEBackwardScalar(data, cos, sin, c.seqLen, c.headDim)
 			}

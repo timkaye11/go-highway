@@ -177,12 +177,14 @@ func BenchmarkRoPE(b *testing.B) {
 		}
 
 		b.Run(fmt.Sprintf("SIMD/seq=%d_dim=%d", c.seqLen, c.headDim), func(b *testing.B) {
+			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
 				RoPE(data, cos, sin, c.seqLen, c.headDim)
 			}
 		})
 
 		b.Run(fmt.Sprintf("Scalar/seq=%d_dim=%d", c.seqLen, c.headDim), func(b *testing.B) {
+			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
 				RoPEScalar(data, cos, sin, c.seqLen, c.headDim)
 			}

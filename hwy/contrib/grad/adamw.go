@@ -36,7 +36,7 @@ func AdamWStepAuto[T hwy.Floats](
 	}
 
 	if pool == nil || n < activation.MinParallelActivationOps {
-		AdamWStep(param, grad, m, v, lr, beta1, beta2, epsilon, weightDecay, step)
+		AdamWStepScalar(param, grad, m, v, lr, beta1, beta2, epsilon, weightDecay, step)
 		return
 	}
 
@@ -51,7 +51,7 @@ func AdamWStepAuto[T hwy.Floats](
 		if end > n {
 			end = n
 		}
-		AdamWStep(
+		AdamWStepScalar(
 			param[start:end], grad[start:end],
 			m[start:end], v[start:end],
 			lr, beta1, beta2, epsilon, weightDecay, step,

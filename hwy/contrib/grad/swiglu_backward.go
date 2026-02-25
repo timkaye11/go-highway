@@ -15,6 +15,8 @@
 package grad
 
 import (
+	stdmath "math"
+
 	"github.com/ajroetker/go-highway/hwy"
 	"github.com/ajroetker/go-highway/hwy/contrib/activation"
 	"github.com/ajroetker/go-highway/hwy/contrib/workerpool"
@@ -31,7 +33,7 @@ func SwiGLUBackwardAuto[T hwy.Floats](
 	rows, cols int,
 ) {
 	parallelBackward5(pool, gradOutput, savedGate, savedUp, gradGate, gradUp,
-		rows, cols, SwiGLUBackward[T])
+		rows, cols, SwiGLUBackwardScalar[T])
 }
 
 // GeGLUBackwardAuto computes the backward pass for GeGLU over a [rows, cols]
@@ -42,7 +44,7 @@ func GeGLUBackwardAuto[T hwy.Floats](
 	rows, cols int,
 ) {
 	parallelBackward5(pool, gradOutput, savedGate, savedUp, gradGate, gradUp,
-		rows, cols, GeGLUBackward[T])
+		rows, cols, GeGLUBackwardScalar[T])
 }
 
 // parallelBackward5 applies a backward function with 5 slice arguments
@@ -69,4 +71,40 @@ func parallelBackward5[T hwy.Floats](
 				grad1[off:off+cols], grad2[off:off+cols])
 		}
 	})
+}
+
+// SwiGLUBackwardScalar computes the backward pass for SwiGLU element-wise (scalar).
+func SwiGLUBackwardScalar[T hwy.Floats](gradOutput, savedGate, savedUp, gradGate, gradUp []T) {
+	n := min(len(gradOutput), min(len(savedGate), min(len(savedUp), min(len(gradGate), len(gradUp)))))
+	for i := range n {
+		g := float64(savedGate[i])
+		u := float64(savedUp[i])
+		go_ := float64(gradOutput[i])
+
+		sig := 1.0 / (1.0 + stdmath.Exp(-g))
+		siluG := g * sig
+		dSilu := sig * (1.0 + g*(1.0-sig))
+
+		gradGate[i] += T(go_ * u * dSilu)
+		gradUp[i] += T(go_ * siluG)
+	}
+}
+
+// GeGLUBackwardScalar computes the backward pass for GeGLU element-wise (scalar).
+func GeGLUBackwardScalar[T hwy.Floats](gradOutput, savedGate, savedUp, gradGate, gradUp []T) {
+	n := min(len(gradOutput), min(len(savedGate), min(len(savedUp), min(len(gradGate), len(gradUp)))))
+	for i := range n {
+		g := float64(savedGate[i])
+		u := float64(savedUp[i])
+		go_ := float64(gradOutput[i])
+
+		erfVal := stdmath.Erf(g * 0.7071067811865476)
+		halfOnePlusErf := 0.5 * (1.0 + erfVal)
+		geluG := g * halfOnePlusErf
+		gaussianTerm := g * stdmath.Exp(-0.5*g*g) * 0.3989422804014327
+		dGelu := halfOnePlusErf + gaussianTerm
+
+		gradGate[i] += T(go_ * u * dGelu)
+		gradUp[i] += T(go_ * geluG)
+	}
 }

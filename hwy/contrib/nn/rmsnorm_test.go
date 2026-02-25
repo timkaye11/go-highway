@@ -189,14 +189,23 @@ func BenchmarkRMSNorm(b *testing.B) {
 		}
 
 		b.Run(fmt.Sprintf("SIMD/normSize=%d", normSize), func(b *testing.B) {
+			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
 				RMSNorm(input, output, normSize, weight, 1e-5, false)
 			}
 		})
 
 		b.Run(fmt.Sprintf("Scalar/normSize=%d", normSize), func(b *testing.B) {
+			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
 				RMSNormScalar(input, output, normSize, weight, 1e-5, false)
+			}
+		})
+
+		b.Run(fmt.Sprintf("LayerNorm/normSize=%d", normSize), func(b *testing.B) {
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				LayerNorm(input, output, normSize, weight, weight, 1e-5)
 			}
 		})
 	}

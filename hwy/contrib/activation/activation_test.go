@@ -308,9 +308,14 @@ func BenchmarkGELU(b *testing.B) {
 			input[i] = float32(i-size/2) * 0.1
 		}
 
-		b.Run(fmt.Sprintf("%d", size), func(b *testing.B) {
+		b.Run(fmt.Sprintf("SIMD/%d", size), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				GELU(input, output)
+			}
+		})
+		b.Run(fmt.Sprintf("Scalar/%d", size), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				GELUScalar(input, output)
 			}
 		})
 	}
@@ -326,9 +331,14 @@ func BenchmarkGELUApprox(b *testing.B) {
 			input[i] = float32(i-size/2) * 0.1
 		}
 
-		b.Run(fmt.Sprintf("%d", size), func(b *testing.B) {
+		b.Run(fmt.Sprintf("SIMD/%d", size), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				GELUApprox(input, output)
+			}
+		})
+		b.Run(fmt.Sprintf("Scalar/%d", size), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				GELUApproxScalar(input, output)
 			}
 		})
 	}
@@ -344,9 +354,14 @@ func BenchmarkReLU(b *testing.B) {
 			input[i] = float32(i-size/2) * 0.1
 		}
 
-		b.Run(fmt.Sprintf("%d", size), func(b *testing.B) {
+		b.Run(fmt.Sprintf("SIMD/%d", size), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				ReLU(input, output)
+			}
+		})
+		b.Run(fmt.Sprintf("Scalar/%d", size), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				ReLUScalar(input, output)
 			}
 		})
 	}
@@ -362,9 +377,85 @@ func BenchmarkSiLU(b *testing.B) {
 			input[i] = float32(i-size/2) * 0.1
 		}
 
-		b.Run(fmt.Sprintf("%d", size), func(b *testing.B) {
+		b.Run(fmt.Sprintf("SIMD/%d", size), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				SiLU(input, output)
+			}
+		})
+		b.Run(fmt.Sprintf("Scalar/%d", size), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				SiLUScalar(input, output)
+			}
+		})
+	}
+}
+
+func BenchmarkTanh(b *testing.B) {
+	sizes := []int{8, 64, 256, 1024}
+
+	for _, size := range sizes {
+		input := make([]float32, size)
+		output := make([]float32, size)
+		for i := range input {
+			input[i] = float32(i-size/2) * 0.1
+		}
+
+		b.Run(fmt.Sprintf("SIMD/%d", size), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				Tanh(input, output)
+			}
+		})
+		b.Run(fmt.Sprintf("Scalar/%d", size), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				TanhScalar(input, output)
+			}
+		})
+	}
+}
+
+func BenchmarkELU(b *testing.B) {
+	sizes := []int{8, 64, 256, 1024}
+	var alpha float32 = 1.0
+
+	for _, size := range sizes {
+		input := make([]float32, size)
+		output := make([]float32, size)
+		for i := range input {
+			input[i] = float32(i-size/2) * 0.1
+		}
+
+		b.Run(fmt.Sprintf("SIMD/%d", size), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				ELU(input, output, alpha)
+			}
+		})
+		b.Run(fmt.Sprintf("Scalar/%d", size), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				ELUScalar(input, output, alpha)
+			}
+		})
+	}
+}
+
+func BenchmarkLeakyReLU(b *testing.B) {
+	sizes := []int{8, 64, 256, 1024}
+	var alpha float32 = 0.01
+
+	for _, size := range sizes {
+		input := make([]float32, size)
+		output := make([]float32, size)
+		for i := range input {
+			input[i] = float32(i-size/2) * 0.1
+		}
+
+		b.Run(fmt.Sprintf("SIMD/%d", size), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				LeakyReLU(input, output, alpha)
+			}
+		})
+		b.Run(fmt.Sprintf("Scalar/%d", size), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				LeakyReLUScalar(input, output, alpha)
 			}
 		})
 	}

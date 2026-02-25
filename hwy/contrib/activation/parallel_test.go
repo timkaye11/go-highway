@@ -141,7 +141,7 @@ func TestParallelReLU(t *testing.T) {
 
 			for r := range sz.rows {
 				off := r * sz.cols
-				ReLU(input[off:off+sz.cols], want[off:off+sz.cols])
+				ReLUScalar(input[off:off+sz.cols], want[off:off+sz.cols])
 			}
 			ParallelReLU(pool, input, got, sz.rows, sz.cols)
 			assertClose(t, "ParallelReLU", got, want, 0)
@@ -156,7 +156,7 @@ func TestParallelReLUNilPool(t *testing.T) {
 
 	for r := range 8 {
 		off := r * 8
-		ReLU(input[off:off+8], want[off:off+8])
+		ReLUScalar(input[off:off+8], want[off:off+8])
 	}
 	ParallelReLU[float32](nil, input, got, 8, 8)
 	assertClose(t, "ParallelReLU/nil", got, want, 0)
@@ -212,7 +212,7 @@ func TestParallelLeakyReLU(t *testing.T) {
 
 			for r := range sz.rows {
 				off := r * sz.cols
-				LeakyReLU(input[off:off+sz.cols], want[off:off+sz.cols], alpha)
+				LeakyReLUScalar(input[off:off+sz.cols], want[off:off+sz.cols], alpha)
 			}
 			ParallelLeakyReLU(pool, input, got, sz.rows, sz.cols, alpha)
 			assertClose(t, "ParallelLeakyReLU", got, want, 0)
@@ -228,7 +228,7 @@ func TestParallelLeakyReLUNilPool(t *testing.T) {
 
 	for r := range 8 {
 		off := r * 8
-		LeakyReLU(input[off:off+8], want[off:off+8], alpha)
+		LeakyReLUScalar(input[off:off+8], want[off:off+8], alpha)
 	}
 	ParallelLeakyReLU[float32](nil, input, got, 8, 8, alpha)
 	assertClose(t, "ParallelLeakyReLU/nil", got, want, 0)

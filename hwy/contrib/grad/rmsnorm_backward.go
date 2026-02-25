@@ -43,7 +43,7 @@ func RMSNormBackwardAuto[T hwy.Floats](
 	numGroups := size / normSize
 
 	if pool == nil || numGroups*normSize < activation.MinParallelActivationOps {
-		RMSNormBackward(gradOutput, savedInput, savedRRMS, weight, normSize, gemmaMode,
+		RMSNormBackwardScalar(gradOutput, savedInput, savedRRMS, weight, normSize, gemmaMode,
 			gradInput, gradWeight)
 		return
 	}
@@ -56,7 +56,7 @@ func RMSNormBackwardAuto[T hwy.Floats](
 			xiSlice := savedInput[start*normSize : end*normSize]
 			rrmsSlice := savedRRMS[start:end]
 			giSlice := gradInput[start*normSize : end*normSize]
-			RMSNormBackward(goSlice, xiSlice, rrmsSlice, weight, normSize, gemmaMode,
+			RMSNormBackwardScalar(goSlice, xiSlice, rrmsSlice, weight, normSize, gemmaMode,
 				giSlice, nil)
 		})
 		return
@@ -71,7 +71,7 @@ func RMSNormBackwardAuto[T hwy.Floats](
 		giSlice := gradInput[start*normSize : end*normSize]
 
 		localGW := make([]T, normSize)
-		RMSNormBackward(goSlice, xiSlice, rrmsSlice, weight, normSize, gemmaMode,
+		RMSNormBackwardScalar(goSlice, xiSlice, rrmsSlice, weight, normSize, gemmaMode,
 			giSlice, localGW)
 
 		// Merge local buffer under lock

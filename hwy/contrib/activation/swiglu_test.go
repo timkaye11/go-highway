@@ -153,17 +153,57 @@ func BenchmarkSwiGLU(b *testing.B) {
 			up[i] = float32(i) * 0.001
 		}
 
-		b.Run(fmt.Sprintf("SIMD/%dx%d", s.rows, s.cols), func(b *testing.B) {
+		b.Run(fmt.Sprintf("Parallel/%dx%d", s.rows, s.cols), func(b *testing.B) {
+			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
 				ParallelSwiGLU(pool, gate, up, output, s.rows, s.cols)
 			}
 		})
 
 		b.Run(fmt.Sprintf("Scalar/%dx%d", s.rows, s.cols), func(b *testing.B) {
+			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
 				for r := range s.rows {
 					off := r * s.cols
 					SwiGLUScalar(gate[off:off+s.cols], up[off:off+s.cols], output[off:off+s.cols])
+				}
+			}
+		})
+	}
+}
+
+func BenchmarkGeGLU(b *testing.B) {
+	pool := workerpool.New(0)
+	defer pool.Close()
+
+	sizes := []struct{ rows, cols int }{
+		{32, 768},
+		{32, 3072},
+	}
+
+	for _, s := range sizes {
+		size := s.rows * s.cols
+		gate := make([]float32, size)
+		up := make([]float32, size)
+		output := make([]float32, size)
+		for i := range size {
+			gate[i] = float32(i) * 0.001
+			up[i] = float32(i) * 0.001
+		}
+
+		b.Run(fmt.Sprintf("Parallel/%dx%d", s.rows, s.cols), func(b *testing.B) {
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				ParallelGeGLU(pool, gate, up, output, s.rows, s.cols)
+			}
+		})
+
+		b.Run(fmt.Sprintf("Scalar/%dx%d", s.rows, s.cols), func(b *testing.B) {
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				for r := range s.rows {
+					off := r * s.cols
+					GeGLUScalar(gate[off:off+s.cols], up[off:off+s.cols], output[off:off+s.cols])
 				}
 			}
 		})

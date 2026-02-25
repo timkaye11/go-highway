@@ -185,6 +185,7 @@ func BenchmarkSparseCrossEntropy(b *testing.B) {
 		}
 
 		b.Run(fmt.Sprintf("Fused/%dx%d", c.batch, c.vocab), func(b *testing.B) {
+			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
 				clear(gradLogits)
 				SparseCrossEntropyForwardBackwardAuto(pool, logits, labels, gradLogits, c.batch, c.vocab)
@@ -192,6 +193,7 @@ func BenchmarkSparseCrossEntropy(b *testing.B) {
 		})
 
 		b.Run(fmt.Sprintf("Separate/%dx%d", c.batch, c.vocab), func(b *testing.B) {
+			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
 				clear(gradLogits)
 				SparseCrossEntropyForward(logits, labels, c.batch, c.vocab)

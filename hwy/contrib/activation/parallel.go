@@ -80,10 +80,10 @@ func ParallelGELUApprox[T hwy.Floats](pool *workerpool.Pool, input, output []T, 
 }
 
 // ParallelReLU applies ReLU element-wise across a [rows, cols] matrix in
-// parallel.
+// parallel. Uses scalar implementation (faster than hwygen SIMD on ARM64).
 func ParallelReLU[T hwy.Floats](pool *workerpool.Pool, input, output []T, rows, cols int) {
 	ParallelApplyRows(pool, input, output, rows, cols, func(in, out []T) {
-		ReLU(in, out)
+		ReLUScalar(in, out)
 	})
 }
 
@@ -104,10 +104,11 @@ func ParallelTanh[T hwy.Floats](pool *workerpool.Pool, input, output []T, rows, 
 }
 
 // ParallelLeakyReLU applies LeakyReLU(alpha) element-wise across a
-// [rows, cols] matrix in parallel.
+// [rows, cols] matrix in parallel. Uses scalar implementation (faster than
+// hwygen SIMD on ARM64).
 func ParallelLeakyReLU[T hwy.Floats](pool *workerpool.Pool, input, output []T, rows, cols int, alpha T) {
 	ParallelApplyRows(pool, input, output, rows, cols, func(in, out []T) {
-		LeakyReLU(in, out, alpha)
+		LeakyReLUScalar(in, out, alpha)
 	})
 }
 

@@ -18,7 +18,6 @@ import (
 	stdmath "math"
 
 	"github.com/ajroetker/go-highway/hwy"
-	"github.com/ajroetker/go-highway/hwy/contrib/math"
 	"github.com/ajroetker/go-highway/hwy/contrib/workerpool"
 )
 
@@ -129,42 +128,29 @@ func SparseCrossEntropyForwardBackwardAuto[T hwy.Floats](
 		return 0
 	}
 
-	invN := T(1.0) / T(batchSize)
-	lanes := hwy.MaxLanes[T]()
+	invN := 1.0 / float64(batchSize)
 
 	// Per-sample losses accumulated into a shared slice
-	losses := make([]T, batchSize)
+	losses := make([]float64, batchSize)
 
 	doSample := func(i int) {
 		off := i * vocabSize
 		row := logits[off : off+vocabSize]
 
 		// Pass 1: Max
-		maxVal := row[0]
+		maxVal := float64(row[0])
 		for j := 1; j < vocabSize; j++ {
-			if row[j] > maxVal {
-				maxVal = row[j]
+			if v := float64(row[j]); v > maxVal {
+				maxVal = v
 			}
 		}
 
-		// Pass 2: exp(x - max) and sum — SIMD
-		vMax := hwy.Set(maxVal)
-		expSumAcc := hwy.Zero[T]()
-		// We need the exp values for the gradient pass, store them in gradLogits temporarily
+		// Pass 2: exp(x - max) and sum — store exp values in gradLogits temporarily
 		gRow := gradLogits[off : off+vocabSize]
-
-		ii := 0
-		for ; ii+lanes <= vocabSize; ii += lanes {
-			x := hwy.Load(row[ii:])
-			shifted := hwy.Sub(x, vMax)
-			expVal := math.BaseExpVec(shifted)
-			hwy.Store(expVal, gRow[ii:]) // temporarily store exp values
-			expSumAcc = hwy.Add(expSumAcc, expVal)
-		}
-		expSum := hwy.ReduceSum(expSumAcc)
-		for j := ii; j < vocabSize; j++ {
-			ev := T(stdmath.Exp(float64(row[j]) - float64(maxVal)))
-			gRow[j] = ev
+		var expSum float64
+		for j := range vocabSize {
+			ev := stdmath.Exp(float64(row[j]) - maxVal)
+			gRow[j] = T(ev)
 			expSum += ev
 		}
 
@@ -173,22 +159,14 @@ func SparseCrossEntropyForwardBackwardAuto[T hwy.Floats](
 		if label < 0 || label >= vocabSize {
 			return
 		}
-		losses[i] = -row[label] + maxVal + T(stdmath.Log(float64(expSum)))
+		losses[i] = -float64(row[label]) + maxVal + stdmath.Log(expSum)
 
 		// Pass 3: Gradient — convert stored exp values to softmax, scale, subtract at label
-		vInvExpSum := hwy.Set(T(1.0) / expSum)
-		vInvN := hwy.Set(invN)
-		ii = 0
-		for ; ii+lanes <= vocabSize; ii += lanes {
-			ev := hwy.Load(gRow[ii:])
-			prob := hwy.Mul(ev, vInvExpSum)
-			grad := hwy.Mul(prob, vInvN)
-			hwy.Store(grad, gRow[ii:])
+		invExpSum := 1.0 / expSum
+		for j := range vocabSize {
+			gRow[j] = T(float64(gRow[j]) * invExpSum * invN)
 		}
-		for j := ii; j < vocabSize; j++ {
-			gRow[j] = gRow[j] / expSum * invN
-		}
-		gRow[label] -= invN
+		gRow[label] -= T(invN)
 	}
 
 	if pool != nil && batchSize > 1 {
@@ -200,11 +178,11 @@ func SparseCrossEntropyForwardBackwardAuto[T hwy.Floats](
 	}
 
 	// Sum losses
-	var totalLoss T
+	var totalLoss float64
 	for i := range batchSize {
 		totalLoss += losses[i]
 	}
-	return totalLoss / T(batchSize)
+	return T(totalLoss / float64(batchSize))
 }
 
 // SparseCrossEntropyForwardScalar is a scalar reference implementation.

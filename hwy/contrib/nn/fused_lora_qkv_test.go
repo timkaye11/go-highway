@@ -19,6 +19,8 @@ import (
 	stdmath "math"
 	"testing"
 
+	"github.com/ajroetker/go-highway/hwy/contrib/matmul"
+	"github.com/ajroetker/go-highway/hwy/contrib/vec"
 	"github.com/ajroetker/go-highway/hwy/contrib/workerpool"
 )
 
@@ -160,10 +162,38 @@ func BenchmarkFusedLoRAQKV(b *testing.B) {
 	v := make([]float32, batch*kvDim)
 
 	b.Run("Fused", func(b *testing.B) {
+		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
 			FusedLoRAQKVDenseAuto(pool, x, wQKV, nil, nil, nil,
 				loraQ, loraK, loraV, q, k, v, nil, nil, nil,
 				batch, inF, qDim, kvDim)
+		}
+	})
+
+	b.Run("Separate", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			// Base QKV
+			QKVDenseAuto(pool, x, wQKV, nil, nil, nil, q, k, v,
+				batch, inF, qDim, kvDim)
+			// LoRA Q: h = x@A^T, temp = h@B^T, q += scale*temp
+			hQ := make([]float32, batch*rank)
+			matmul.MatMulKLastAuto(pool, x, loraQ.A, hQ, batch, rank, inF)
+			tempQ := make([]float32, batch*qDim)
+			matmul.MatMulKLastAuto(pool, hQ, loraQ.B, tempQ, batch, qDim, rank)
+			vec.MulConstAddTo(q, loraQ.Scale, tempQ)
+			// LoRA K
+			hK := make([]float32, batch*rank)
+			matmul.MatMulKLastAuto(pool, x, loraK.A, hK, batch, rank, inF)
+			tempK := make([]float32, batch*kvDim)
+			matmul.MatMulKLastAuto(pool, hK, loraK.B, tempK, batch, kvDim, rank)
+			vec.MulConstAddTo(k, loraK.Scale, tempK)
+			// LoRA V
+			hV := make([]float32, batch*rank)
+			matmul.MatMulKLastAuto(pool, x, loraV.A, hV, batch, rank, inF)
+			tempV := make([]float32, batch*kvDim)
+			matmul.MatMulKLastAuto(pool, hV, loraV.B, tempV, batch, kvDim, rank)
+			vec.MulConstAddTo(v, loraV.Scale, tempV)
 		}
 	})
 }

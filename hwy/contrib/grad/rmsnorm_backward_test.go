@@ -208,6 +208,7 @@ func BenchmarkRMSNormBackward(b *testing.B) {
 		weight[i] = 1.0
 	}
 
+	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		clear(gradInput)

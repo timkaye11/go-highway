@@ -208,7 +208,10 @@ func BenchmarkFusedLoRAMLPBackward(b *testing.B) {
 		gradWUp := make([]float32, c.interSize*c.inF)
 		gradWDown := make([]float32, c.inF*c.interSize)
 
-		b.Run(fmt.Sprintf("b%d_%dx%d_r%d", c.batch, c.inF, c.interSize, c.rank), func(b *testing.B) {
+		label := fmt.Sprintf("b%d_%dx%d_r%d", c.batch, c.inF, c.interSize, c.rank)
+
+		b.Run("Fused/"+label, func(b *testing.B) {
+			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
 				clear(gradX)
 				clear(gradWGate)
@@ -220,6 +223,40 @@ func BenchmarkFusedLoRAMLPBackward(b *testing.B) {
 					gradX, gradWGate, gradWUp, gradWDown,
 					nil, nil, nil,
 					c.batch, c.inF, c.interSize)
+			}
+		})
+
+		b.Run("Separate/"+label, func(b *testing.B) {
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				clear(gradX)
+				clear(gradWGate)
+				clear(gradWUp)
+				clear(gradWDown)
+				// Down backward
+				gradHidden := make([]float32, c.batch*c.interSize)
+				DenseBackwardAuto(pool, gradOutput, saved.Hidden, wDown,
+					gradHidden, gradWDown, nil, c.batch, c.interSize, c.inF)
+				LoRABackwardAuto(pool, gradOutput, saved.Hidden, saved.HDown,
+					wDown, loraDown.A, loraDown.B, loraDown.Scale,
+					gradHidden, nil, nil, c.batch, c.interSize, c.inF, loraDown.Rank)
+				// SwiGLU backward
+				gradGate := make([]float32, c.batch*c.interSize)
+				gradUp := make([]float32, c.batch*c.interSize)
+				SwiGLUBackwardAuto(pool, gradHidden, saved.Gate, saved.Up,
+					gradGate, gradUp, c.batch, c.interSize)
+				// Gate backward
+				DenseBackwardAuto(pool, gradGate, saved.X, wGate,
+					gradX, gradWGate, nil, c.batch, c.inF, c.interSize)
+				LoRABackwardAuto(pool, gradGate, saved.X, saved.HGate,
+					wGate, loraGate.A, loraGate.B, loraGate.Scale,
+					gradX, nil, nil, c.batch, c.inF, c.interSize, loraGate.Rank)
+				// Up backward
+				DenseBackwardAuto(pool, gradUp, saved.X, wUp,
+					gradX, gradWUp, nil, c.batch, c.inF, c.interSize)
+				LoRABackwardAuto(pool, gradUp, saved.X, saved.HUp,
+					wUp, loraUp.A, loraUp.B, loraUp.Scale,
+					gradX, nil, nil, c.batch, c.inF, c.interSize, loraUp.Rank)
 			}
 		})
 	}

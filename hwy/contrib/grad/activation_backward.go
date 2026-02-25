@@ -15,6 +15,8 @@
 package grad
 
 import (
+	stdmath "math"
+
 	"github.com/ajroetker/go-highway/hwy"
 	"github.com/ajroetker/go-highway/hwy/contrib/activation"
 	"github.com/ajroetker/go-highway/hwy/contrib/workerpool"
@@ -25,19 +27,19 @@ import (
 //
 // gradOutput and savedInput are [rows, cols]. gradInput is accumulated into.
 func GELUBackwardAuto[T hwy.Floats](pool *workerpool.Pool, gradOutput, savedInput, gradInput []T, rows, cols int) {
-	parallelBackward3(pool, gradOutput, savedInput, gradInput, rows, cols, GELUBackward[T])
+	parallelBackward3(pool, gradOutput, savedInput, gradInput, rows, cols, GELUBackwardScalar[T])
 }
 
 // ReLUBackwardAuto computes the backward pass for ReLU over a [rows, cols]
 // matrix in parallel.
 func ReLUBackwardAuto[T hwy.Floats](pool *workerpool.Pool, gradOutput, savedInput, gradInput []T, rows, cols int) {
-	parallelBackward3(pool, gradOutput, savedInput, gradInput, rows, cols, ReLUBackward[T])
+	parallelBackward3(pool, gradOutput, savedInput, gradInput, rows, cols, ReLUBackwardScalar[T])
 }
 
 // SiLUBackwardAuto computes the backward pass for SiLU over a [rows, cols]
 // matrix in parallel.
 func SiLUBackwardAuto[T hwy.Floats](pool *workerpool.Pool, gradOutput, savedInput, gradInput []T, rows, cols int) {
-	parallelBackward3(pool, gradOutput, savedInput, gradInput, rows, cols, SiLUBackward[T])
+	parallelBackward3(pool, gradOutput, savedInput, gradInput, rows, cols, SiLUBackwardScalar[T])
 }
 
 // TanhBackwardAuto computes the backward pass for Tanh over a [rows, cols]
@@ -45,7 +47,51 @@ func SiLUBackwardAuto[T hwy.Floats](pool *workerpool.Pool, gradOutput, savedInpu
 //
 // savedOutput is the tanh output (not the input) saved from the forward pass.
 func TanhBackwardAuto[T hwy.Floats](pool *workerpool.Pool, gradOutput, savedOutput, gradInput []T, rows, cols int) {
-	parallelBackward3(pool, gradOutput, savedOutput, gradInput, rows, cols, TanhBackward[T])
+	parallelBackward3(pool, gradOutput, savedOutput, gradInput, rows, cols, TanhBackwardScalar[T])
+}
+
+// GELUBackwardScalar is a scalar reference implementation for GELU backward.
+func GELUBackwardScalar[T hwy.Floats](gradOutput, savedInput, gradInput []T) {
+	n := min(len(gradOutput), min(len(savedInput), len(gradInput)))
+	for i := range n {
+		x := float64(savedInput[i])
+		erfVal := stdmath.Erf(x * 0.7071067811865476)
+		term1 := 0.5 * (1.0 + erfVal)
+		term2 := x * 0.3989422804014327 * stdmath.Exp(-0.5*x*x)
+		gradInput[i] += gradOutput[i] * T(term1+term2)
+	}
+}
+
+// ReLUBackwardScalar is a scalar reference implementation for ReLU backward.
+func ReLUBackwardScalar[T hwy.Floats](gradOutput, savedInput, gradInput []T) {
+	n := min(len(gradOutput), min(len(savedInput), len(gradInput)))
+	for i := range n {
+		if savedInput[i] > 0 {
+			gradInput[i] += gradOutput[i]
+		}
+	}
+}
+
+// SiLUBackwardScalar is a scalar reference implementation for SiLU backward.
+func SiLUBackwardScalar[T hwy.Floats](gradOutput, savedInput, gradInput []T) {
+	n := min(len(gradOutput), min(len(savedInput), len(gradInput)))
+	for i := range n {
+		x := float64(savedInput[i])
+		sig := 1.0 / (1.0 + stdmath.Exp(-x))
+		dSilu := sig * (1.0 + x*(1.0-sig))
+		gradInput[i] += gradOutput[i] * T(dSilu)
+	}
+}
+
+// TanhBackwardScalar is a scalar reference implementation for Tanh backward.
+// savedOutput is the tanh output (not the input) saved from the forward pass.
+func TanhBackwardScalar[T hwy.Floats](gradOutput, savedOutput, gradInput []T) {
+	n := min(len(gradOutput), min(len(savedOutput), len(gradInput)))
+	for i := range n {
+		tanhX := savedOutput[i]
+		dTanh := T(1) - tanhX*tanhX
+		gradInput[i] += gradOutput[i] * dTanh
+	}
 }
 
 // parallelBackward3 applies a backward function with 3 slice arguments (gradOutput,

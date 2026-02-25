@@ -102,65 +102,33 @@ func rmsNormSaveSeq[T hwy.Floats](
 ) {
 	size := min(len(input), len(output))
 	numGroups := size / normSize
-	invN := T(1.0) / T(normSize)
-	lanes := hwy.MaxLanes[T]()
 
 	for g := range numGroups {
 		off := g * normSize
 
-		// Pass 1: Compute sum of squares
-		sqAcc := hwy.Zero[T]()
-		ii := 0
-		for ; ii+lanes <= normSize; ii += lanes {
-			x := hwy.Load(input[off+ii:])
-			sqAcc = hwy.MulAdd(x, x, sqAcc)
-		}
-		sumSq := hwy.ReduceSum(sqAcc)
-		for i := ii; i < normSize; i++ {
-			sumSq += input[off+i] * input[off+i]
+		// Compute sum of squares
+		var sumSq float64
+		for i := range normSize {
+			x := float64(input[off+i])
+			sumSq += x * x
 		}
 
 		// Compute and save reciprocal RMS
-		rrms := T(1.0 / stdmath.Sqrt(float64(sumSq*invN+epsilon)))
-		savedRRMS[g] = rrms
-		vRRMS := hwy.Set(rrms)
+		rrms := 1.0 / stdmath.Sqrt(sumSq/float64(normSize)+float64(epsilon))
+		savedRRMS[g] = T(rrms)
 
-		// Pass 2: Normalize and apply weight
+		// Normalize
 		if weight != nil && gemmaMode {
-			vOne := hwy.Const[T](1.0)
-			ii = 0
-			for ; ii+lanes <= normSize; ii += lanes {
-				x := hwy.Load(input[off+ii:])
-				normed := hwy.Mul(x, vRRMS)
-				w := hwy.Load(weight[ii:])
-				wEff := hwy.Add(w, vOne)
-				result := hwy.Mul(normed, wEff)
-				hwy.Store(result, output[off+ii:])
-			}
-			for i := ii; i < normSize; i++ {
-				output[off+i] = input[off+i] * rrms * (weight[i] + 1.0)
+			for i := range normSize {
+				output[off+i] = T(float64(input[off+i]) * rrms * (float64(weight[i]) + 1.0))
 			}
 		} else if weight != nil {
-			ii = 0
-			for ; ii+lanes <= normSize; ii += lanes {
-				x := hwy.Load(input[off+ii:])
-				normed := hwy.Mul(x, vRRMS)
-				w := hwy.Load(weight[ii:])
-				result := hwy.Mul(normed, w)
-				hwy.Store(result, output[off+ii:])
-			}
-			for i := ii; i < normSize; i++ {
-				output[off+i] = input[off+i] * rrms * weight[i]
+			for i := range normSize {
+				output[off+i] = T(float64(input[off+i]) * rrms * float64(weight[i]))
 			}
 		} else {
-			ii = 0
-			for ; ii+lanes <= normSize; ii += lanes {
-				x := hwy.Load(input[off+ii:])
-				result := hwy.Mul(x, vRRMS)
-				hwy.Store(result, output[off+ii:])
-			}
-			for i := ii; i < normSize; i++ {
-				output[off+i] = input[off+i] * rrms
+			for i := range normSize {
+				output[off+i] = T(float64(input[off+i]) * rrms)
 			}
 		}
 	}
@@ -175,13 +143,13 @@ func ParallelRMSNorm[T hwy.Floats](pool *workerpool.Pool, input, output []T, nor
 	numGroups := size / normSize
 
 	if pool == nil || numGroups*normSize < activation.MinParallelActivationOps {
-		RMSNorm(input, output, normSize, weight, epsilon, gemmaMode)
+		RMSNormScalar(input, output, normSize, weight, epsilon, gemmaMode)
 		return
 	}
 
 	pool.ParallelForAtomicBatched(numGroups, activation.ActivationRowBatch, func(start, end int) {
 		inSlice := input[start*normSize : end*normSize]
 		outSlice := output[start*normSize : end*normSize]
-		RMSNorm(inSlice, outSlice, normSize, weight, epsilon, gemmaMode)
+		RMSNormScalar(inSlice, outSlice, normSize, weight, epsilon, gemmaMode)
 	})
 }

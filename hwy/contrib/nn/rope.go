@@ -55,7 +55,7 @@ func RoPEAuto[T hwy.Floats](
 			off := kvIdx * headStride
 			data = K[off : off+headStride]
 		}
-		RoPE(data, cos, sin, seqLen, headDim)
+		RoPEScalar(data, cos, sin, seqLen, headDim)
 	}
 
 	if pool != nil && totalHeads > 1 {

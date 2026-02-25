@@ -176,6 +176,7 @@ func BenchmarkFusedLoRADenseBackward(b *testing.B) {
 	gradB := make([]float32, dOut*rank)
 
 	b.Run("Fused", func(b *testing.B) {
+		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
 			clear(gradX)
 			clear(gradWeight)
@@ -188,6 +189,7 @@ func BenchmarkFusedLoRADenseBackward(b *testing.B) {
 	})
 
 	b.Run("Separate", func(b *testing.B) {
+		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
 			clear(gradX)
 			clear(gradWeight)

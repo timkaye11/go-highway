@@ -222,11 +222,94 @@ func BenchmarkGELUBackward(b *testing.B) {
 		savedInput[i] = float32(i)*0.01 - 3.0
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		for j := range gradInput {
-			gradInput[j] = 0
+	b.Run("Auto", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			clear(gradInput)
+			GELUBackwardAuto(pool, gradOutput, savedInput, gradInput, 8, 768)
 		}
-		GELUBackwardAuto(pool, gradOutput, savedInput, gradInput, 8, 768)
+	})
+	b.Run("SIMD", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			clear(gradInput)
+			GELUBackward(gradOutput, savedInput, gradInput)
+		}
+	})
+	b.Run("Scalar", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			clear(gradInput)
+			GELUBackwardScalar(gradOutput, savedInput, gradInput)
+		}
+	})
+}
+
+func BenchmarkReLUBackward(b *testing.B) {
+	n := 8 * 768
+	gradOutput := make([]float32, n)
+	savedInput := make([]float32, n)
+	gradInput := make([]float32, n)
+	for i := range n {
+		gradOutput[i] = float32(i) * 0.001
+		savedInput[i] = float32(i)*0.01 - 3.0
 	}
+
+	b.Run("SIMD", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			clear(gradInput)
+			ReLUBackward(gradOutput, savedInput, gradInput)
+		}
+	})
+	b.Run("Scalar", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			clear(gradInput)
+			ReLUBackwardScalar(gradOutput, savedInput, gradInput)
+		}
+	})
+}
+
+func BenchmarkSiLUBackward(b *testing.B) {
+	n := 8 * 768
+	gradOutput := make([]float32, n)
+	savedInput := make([]float32, n)
+	gradInput := make([]float32, n)
+	for i := range n {
+		gradOutput[i] = float32(i) * 0.001
+		savedInput[i] = float32(i)*0.01 - 3.0
+	}
+
+	b.Run("SIMD", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			clear(gradInput)
+			SiLUBackward(gradOutput, savedInput, gradInput)
+		}
+	})
+	b.Run("Scalar", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			clear(gradInput)
+			SiLUBackwardScalar(gradOutput, savedInput, gradInput)
+		}
+	})
+}
+
+func BenchmarkTanhBackward(b *testing.B) {
+	n := 8 * 768
+	gradOutput := make([]float32, n)
+	savedOutput := make([]float32, n)
+	gradInput := make([]float32, n)
+	for i := range n {
+		gradOutput[i] = float32(i) * 0.001
+		savedOutput[i] = float32(stdmath.Tanh(float64(i)*0.01 - 3.0))
+	}
+
+	b.Run("SIMD", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			clear(gradInput)
+			TanhBackward(gradOutput, savedOutput, gradInput)
+		}
+	})
+	b.Run("Scalar", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			clear(gradInput)
+			TanhBackwardScalar(gradOutput, savedOutput, gradInput)
+		}
+	})
 }

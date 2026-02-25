@@ -187,8 +187,19 @@ func BenchmarkAdamWStep(b *testing.B) {
 		grad[i] = float32(i) * 0.00001
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		AdamWStepAuto(pool, param, grad, m, v, 0.001, 0.9, 0.999, 1e-8, 0.01, i+1)
-	}
+	b.Run("Auto", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			AdamWStepAuto(pool, param, grad, m, v, 0.001, 0.9, 0.999, 1e-8, 0.01, i+1)
+		}
+	})
+	b.Run("SIMD", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			AdamWStep(param, grad, m, v, 0.001, 0.9, 0.999, 1e-8, 0.01, i+1)
+		}
+	})
+	b.Run("Scalar", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			AdamWStepScalar(param, grad, m, v, 0.001, 0.9, 0.999, 1e-8, 0.01, i+1)
+		}
+	})
 }
